@@ -1,0 +1,14 @@
+# Dependencias
+node_modules/
+BuddyAppFront/node_modules/
+BuddyAppBack/node_modules/
+BuddyAppBack/backend/node_modules/
+# Variables de entorno (¡Muy importante!)
+.env
+BuddyAppFront/.env
+BuddyAppBack/.env
+
+# Archivos de sistema
+.DS_Store
+dist/
+build/
