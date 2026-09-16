@@ -22,7 +22,6 @@ type Profile = {
 export default function ProfileScreen({ route }: any) {
   const viewedUserId: number | null = route?.params?.userId ?? null;
   const isOwnProfile = viewedUserId === null;
-  const myUserId = 1; // 🔹 aquí tu propio ID, o sacarlo de tu auth context
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -61,8 +60,12 @@ if (!isOwnProfile) {
   };
 
   useEffect(() => {
+    setProfile(null);
+    setIsEditing(false);
+    setErrorMessage('');
+    setDivesWithMe(null);
     fetchProfile();
-  }, []);
+  }, [viewedUserId]);
 
   const saveProfile = async () => {
     try {
@@ -88,7 +91,8 @@ if (!isOwnProfile) {
   if (!profile) {
     return (
       <View style={styles.container}>
-        <Text>Cargando perfil...</Text>
+        <Text accessibilityRole={errorMessage ? 'alert' : undefined}>{errorMessage || 'Cargando perfil...'}</Text>
+        {errorMessage ? <TouchableOpacity accessibilityRole="button" style={styles.editButton} onPress={fetchProfile}><Text style={styles.editButtonText}>Reintentar</Text></TouchableOpacity> : null}
       </View>
     );
   }

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
   Platform,
   TouchableOpacity,
@@ -23,11 +22,17 @@ export default function DiveDetailScreen({ route, navigation }: any) {
   const [savingNotes, setSavingNotes] = useState(false);
   const [saved, setSaved] = useState(false);
   const [myUserId, setMyUserId] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState('');
 
   const fetchDive = async () => {
+    setLoadError('');
     try {
       const res = await API.get(`/dives/my`);
       const myDive = res.data.find((d: Dive) => d.id === diveId);
+      if (!myDive) {
+        setLoadError('Esta inmersión ya no está disponible.');
+        return;
+      }
       setDive(myDive);
 
       const buddiesRes = await API.get(`/dives/${diveId}/buddies`);
@@ -38,7 +43,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
         setMyNotes(notesRes.data.notes || '');
       } catch {}
     } catch (err) {
-      console.log(err);
+      setLoadError('No se pudo cargar la inmersión.');
     }
   };
 
@@ -56,9 +61,12 @@ export default function DiveDetailScreen({ route, navigation }: any) {
   };
 
   useEffect(() => {
+    setDive(null);
+    setBuddies([]);
+    setMyNotes('');
     fetchDive();
     extractMyUserId();
-  }, []);
+  }, [diveId]);
 
   const saveMyNotes = async () => {
     try {
@@ -115,14 +123,15 @@ export default function DiveDetailScreen({ route, navigation }: any) {
   if (!dive) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loading}>Cargando inmersión…</Text>
+        <Text accessibilityRole={loadError ? 'alert' : undefined} style={styles.loading}>{loadError || 'Cargando inmersión…'}</Text>
+        {loadError ? <TouchableOpacity accessibilityRole="button" style={styles.shareButton} onPress={fetchDive}><Text style={styles.shareButtonText}>Reintentar</Text></TouchableOpacity> : null}
       </View>
     );
   }
 
   return (
     
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {/* CARD PRINCIPAL */}
       <View style={styles.card}>
         <Text style={styles.country}>{dive.country}</Text>
@@ -167,17 +176,18 @@ export default function DiveDetailScreen({ route, navigation }: any) {
 
       {/* NOTAS */}
       {}
-      <View style={[styles.notesCard, styles.shadow, { marginHorizontal: -12 }]}>
+      <View style={[styles.notesCard, styles.shadow]}>
         <Text style={styles.sectionTitle}>Notas</Text>
 
         <TextInput
+          accessibilityLabel="Notas personales"
           value={myNotes}
           onChangeText={setMyNotes}
           multiline
           style={styles.notesInput}
         />
 
-        <TouchableOpacity style={styles.saveButton} onPress={saveMyNotes}>
+        <TouchableOpacity accessibilityRole="button" disabled={savingNotes} accessibilityState={{ disabled: savingNotes, busy: savingNotes }} style={styles.saveButton} onPress={saveMyNotes}>
           <Text style={styles.saveButtonText}>
             {savingNotes ? 'Guardando…' : saved ? 'Guardado ✓' : 'Guardar notas'}
           </Text>
@@ -188,18 +198,15 @@ export default function DiveDetailScreen({ route, navigation }: any) {
       <Text style={styles.sectionTitle}>Buddies</Text>
 
       {}
-      <FlatList
-        data={buddies}
-        keyExtractor={(item) => item.userId.toString()}
-        renderItem={({ item }) => {
+      {buddies.map(item => {
           const isMe = item.userId === myUserId;
 
           return (
             <TouchableOpacity
+              key={item.userId}
+              accessibilityRole="button"
               onPress={() => {
-                if (!isMe) {
-                  navigation.navigate('Profile', { userId: item.userId });
-                }
+                navigation.navigate('Profile', { userId: isMe ? undefined : item.userId });
               }}
               style={[
                 styles.buddyCard,
@@ -215,19 +222,19 @@ export default function DiveDetailScreen({ route, navigation }: any) {
               <Text style={styles.buddyEmail}>{item.email}</Text>
             </TouchableOpacity>
           );
-        }}
-        ListEmptyComponent={
+        })}
+        {buddies.length === 0 && (
           <Text style={styles.emptyText}>
             Aún no hay buddies en esta inmersión 🤿
           </Text>
-        }
-      />
+        )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
+  container: { flex: 1, backgroundColor: '#f7f9fc' },
+  content: { width: '100%', maxWidth: 1050, alignSelf: 'center', padding: 20, paddingBottom: 40 },
   loading: { textAlign: 'center', marginTop: 40 },
 
   card: {
@@ -252,16 +259,16 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 22, fontWeight: 'bold', flexShrink: 1 }, 
   leaveText: { color: '#CC3B3B', fontWeight: '600' },
-  date: { color: '#e0e0e0', marginTop: 4, fontSize: 12 }, 
+  date: { color: '#555', marginTop: 4, fontSize: 12 },
 
-  statsRow: { flexDirection: 'row', marginTop: 20 },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 },
   statBox: {
     flex: 1,
     backgroundColor: '#f2f8ff',
     padding: 15,
     borderRadius: 15,
     alignItems: 'center',
-    marginHorizontal: 5,
+    minWidth: 120,
   },
 
   statValue: { fontSize: 20, fontWeight: 'bold', color: '#0077CC' },
