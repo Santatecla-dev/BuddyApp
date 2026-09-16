@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   Pressable,
+  ScrollView, 
 } from 'react-native';
 import API from '../api/api';
 import { DiveBuddy, Dive } from '../types';
@@ -46,7 +47,6 @@ export default function DiveDetailScreen({ route, navigation }: any) {
       const authHeader = API.defaults.headers.common['Authorization'];
       if (typeof authHeader === 'string') {
         const token = authHeader.split(' ')[1];
-        // Nota: atob funciona en Web y en la mayoría de entornos modernos de RN
         const payload = JSON.parse(atob(token.split('.')[1]));
         setMyUserId(payload.userId);
       }
@@ -67,7 +67,6 @@ export default function DiveDetailScreen({ route, navigation }: any) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      // En web, si el alert falla, esto al menos se verá en consola
       console.error('Error al guardar notas');
       if (Platform.OS === 'web') {
         window.alert('Error: No se pudieron guardar las notas');
@@ -84,13 +83,11 @@ export default function DiveDetailScreen({ route, navigation }: any) {
     const message = '¿Seguro que quieres salir de esta inmersión?';
 
     if (Platform.OS === 'web') {
-      // Solución para Navegadores (Edge, Chrome, etc)
       const confirmed = window.confirm(`${title}\n\n${message}`);
       if (confirmed) {
         leaveDive();
       }
     } else {
-      // Solución para App Nativa
       Alert.alert(
         title,
         message,
@@ -124,11 +121,13 @@ export default function DiveDetailScreen({ route, navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
+    
+    <ScrollView style={styles.container}>
       {/* CARD PRINCIPAL */}
       <View style={styles.card}>
         <Text style={styles.country}>{dive.country}</Text>
 
+        {}
         <View style={styles.cardHeader}>
           <Text style={styles.title}>{dive.location}</Text>
 
@@ -137,6 +136,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
           </Pressable>
         </View>
 
+        {}
         <Text style={styles.date}>
           {new Date(dive.date).toLocaleDateString()} ·{' '}
           {new Date(dive.date).toLocaleTimeString([], {
@@ -166,7 +166,8 @@ export default function DiveDetailScreen({ route, navigation }: any) {
       </View>
 
       {/* NOTAS */}
-      <View style={[styles.notesCard, styles.shadow]}>
+      {}
+      <View style={[styles.notesCard, styles.shadow, { marginHorizontal: -12 }]}>
         <Text style={styles.sectionTitle}>Notas</Text>
 
         <TextInput
@@ -186,6 +187,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
       {/* BUDDIES */}
       <Text style={styles.sectionTitle}>Buddies</Text>
 
+      {}
       <FlatList
         data={buddies}
         keyExtractor={(item) => item.userId.toString()}
@@ -220,7 +222,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
           </Text>
         }
       />
-    </View>
+    </ScrollView>
   );
 }
 
@@ -247,10 +249,10 @@ const styles = StyleSheet.create({
   },
 
   country: { color: '#0077CC', fontWeight: 'bold' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  title: { fontSize: 22, fontWeight: 'bold' },
-  leaveText: { color: '#CC3B3B' },
-  date: { color: '#666', marginTop: 4 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title: { fontSize: 22, fontWeight: 'bold', flexShrink: 1 }, 
+  leaveText: { color: '#CC3B3B', fontWeight: '600' },
+  date: { color: '#e0e0e0', marginTop: 4, fontSize: 12 }, 
 
   statsRow: { flexDirection: 'row', marginTop: 20 },
   statBox: {
@@ -282,7 +284,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, marginTop: 5 },
 
   notesInput: {
     borderWidth: 1,
@@ -334,5 +336,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  emptyText: { textAlign: 'center', color: '#777', marginTop: 20 },
+  emptyText: { textAlign: 'center', color: '#777', marginTop: 20, marginBottom: 30 },
 });

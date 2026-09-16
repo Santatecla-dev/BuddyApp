@@ -124,6 +124,7 @@ export default function CreateDiveScreen({ navigation }: any) {
       <TextInput value={location} onChangeText={setLocation} style={styles.input} />
 
       <Text style={styles.label}>Fecha</Text>
+      
       <View style={styles.dateRow}>
         <TextInput placeholder="DD" value={day} onChangeText={setDay} keyboardType="numeric" maxLength={2} style={[styles.input, styles.smallInput]} />
         <TextInput placeholder="MM" value={month} onChangeText={setMonth} keyboardType="numeric" maxLength={2} style={[styles.input, styles.smallInput]} />
@@ -140,6 +141,7 @@ export default function CreateDiveScreen({ navigation }: any) {
       <Text style={styles.label}>Duración (minutos)</Text>
       <TextInput value={duration} onChangeText={setDuration} style={styles.input} keyboardType="numeric" />
 
+     
       <TouchableOpacity style={styles.mainButton} onPress={createDive}>
         <Text style={styles.buttonText}>Crear inmersión</Text>
       </TouchableOpacity>
@@ -149,13 +151,13 @@ export default function CreateDiveScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
-  label: { fontWeight: 'bold', marginBottom: 4, color: '#333' },
+  label: { fontWeight: 'bold', marginBottom: 2, color: '#333' }, // Margen inferior reducido sutilmente
   dropdown: {
     borderWidth: 1,
     borderColor: '#0077CC',
     borderRadius: 30,
     backgroundColor: '#fff',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   input: {
     backgroundColor: '#fff',
@@ -163,29 +165,31 @@ const styles = StyleSheet.create({
     borderColor: '#0077CC',
     borderRadius: 30,
     paddingHorizontal: 15,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
-    marginBottom: 6,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8, // Padding vertical modificado
+    marginBottom: 4,
   },
   dateRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    marginHorizontal: -5, 
   },
   smallInput: {
-    width: '48%',
+    width: '55%',
     textAlign: 'center',
   },
   fullInput: {
     width: '100%',
     textAlign: 'center',
   },
-  errorText: { color: 'red', fontSize: 12, marginBottom: 8 },
+  errorText: { color: 'red', fontSize: 11, marginBottom: 6 },
   mainButton: {
     backgroundColor: '#0077CC',
     padding: 15,
     borderRadius: 30,
     alignItems: 'center',
-    marginTop: 15,
+    marginTop: 10,
+    marginHorizontal: 30, 
   },
   buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 });
