@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  SectionList,
   StyleSheet,
   TouchableOpacity,
-  Platform,
-  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import API from '../api/api';
 import { Dive } from '../types';
@@ -63,6 +62,8 @@ type FavoriteBuddy = {
 };
 
 export default function MyDivesScreen({ navigation, route }: any) {
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [dives, setDives] = useState<Dive[]>([]);
   const [groupedByCountry, setGroupedByCountry] = useState(false);
   const [hasPendingInvites, setHasPendingInvites] = useState(false);
@@ -73,15 +74,21 @@ export default function MyDivesScreen({ navigation, route }: any) {
     try {
       const res = await API.get('/dives/my');
       setDives(res.data);
+      setLoadError('');
     } catch (err) {
-      console.log(err);
+      setLoadError('No se pudieron cargar las inmersiones.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const computeFavoriteBuddy = async (dives: Dive[]) => {
+  const computeFavoriteBuddy = async (dives: Dive[], isActive: () => boolean) => {
     const buddyCount: Record<number, { name: string; count: number }> = {};
 
-    for (const dive of dives) {
+    let next = 0;
+    const worker = async () => {
+    while (next < dives.length && isActive()) {
+      const dive = dives[next++];
       try {
         const res = await API.get(`/dives/${dive.id}/buddies`);
         const buddies = res.data;
@@ -100,6 +107,8 @@ export default function MyDivesScreen({ navigation, route }: any) {
         });
       } catch {}
     }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, dives.length) }, worker));
 
     let topBuddy: FavoriteBuddy | null = null;
 
@@ -113,7 +122,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
       }
     });
 
-    setFavoriteBuddy(topBuddy);
+    if (isActive()) setFavoriteBuddy(topBuddy);
   };
 
   const fetchPendingInvites = async () => {
@@ -136,7 +145,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
         const token = authHeader.split(' ')[1];
 
         if (token) {
-          const payload = JSON.parse(atob(token.split('.')[1]));
+          const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
           setDiverId(payload.userId);
         }
       }
@@ -162,7 +171,8 @@ export default function MyDivesScreen({ navigation, route }: any) {
     }
   }, [route.params?.removeDiveId]);
 
-  const groupedDives = () => {
+  const sections = useMemo(() => {
+    if (!groupedByCountry) return dives.length ? [{ title: '', data: dives }] : [];
     const groups: { [country: string]: Dive[] } = {};
 
     dives.forEach(d => {
@@ -173,29 +183,26 @@ export default function MyDivesScreen({ navigation, route }: any) {
       groups[d.country].push(d);
     });
 
-    return groups;
-  };
+    return Object.entries(groups).map(([title, data]) => ({ title, data }));
+  }, [dives, groupedByCountry]);
 
   useEffect(() => {
+    let active = true;
+    setFavoriteBuddy(null);
     if (diverId && dives.length > 0) {
-      computeFavoriteBuddy(dives);
+      computeFavoriteBuddy(dives, () => active);
     }
+    return () => { active = false; };
   }, [diverId, dives]);
 
-  const goToProfile = (userId?: number) => {
-    if (!userId || userId === diverId) {
-      navigation.navigate('Profile');
-    } else {
-      alert('No se pueden ver los perfiles de otros divers todavía');
-    }
-  };
-
   return (
-    <ScrollView
+    <SectionList
       style={styles.container}
       contentContainerStyle={styles.webContentContainer}
-      showsVerticalScrollIndicator={false}
-    >
+      sections={sections}
+      keyExtractor={item => item.id.toString()}
+      stickySectionHeadersEnabled={false}
+      ListHeaderComponent={<>
       <View style={styles.topInfo}>
         <View style={styles.topInfoText}>
           <Text style={styles.infoText}>
@@ -207,16 +214,17 @@ export default function MyDivesScreen({ navigation, route }: any) {
           </Text>
         </View>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.profileButton}
-          onPress={() => goToProfile()}
+          accessibilityLabel="Mi perfil"
+          onPress={() => navigation.navigate('Profile', { userId: undefined })}
         >
           <Text style={styles.profileIcon}>👤</Text>
         </TouchableOpacity>
       </View>
 
       {favoriteBuddy && (
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.favoriteBuddyCard}
           activeOpacity={0.8}
           onPress={() =>
@@ -239,7 +247,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={styles.mainButton}
         onPress={() => navigation.navigate('CreateDive')}
       >
@@ -248,7 +256,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={styles.secondaryButton}
         onPress={() => navigation.navigate('Invitations')}
       >
@@ -263,9 +271,10 @@ export default function MyDivesScreen({ navigation, route }: any) {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={styles.groupButton}
-        onPress={() => setGroupedByCountry(!groupedByCountry)}
+        accessibilityState={{ expanded: groupedByCountry }}
+        onPress={() => setGroupedByCountry(value => !value)}
       >
         <Text style={styles.groupButtonText}>
           {groupedByCountry
@@ -274,128 +283,36 @@ export default function MyDivesScreen({ navigation, route }: any) {
         </Text>
       </TouchableOpacity>
 
-      {groupedByCountry ? (
-        Object.entries(groupedDives()).map(
-          ([country, divesInCountry]) => (
-            <View
-              key={country}
-              style={styles.countryGroup}
-            >
-              <View style={styles.groupHeaderRow}>
-                <Text style={styles.groupHeader}>
-                  {country}
-                </Text>
 
-                {CountryISO[country] && (
-                  <CountryFlag
-                    isoCode={CountryISO[country]}
-                    size={18}
-                    style={styles.flag}
-                  />
-                )}
-              </View>
-
-              {divesInCountry.map(item => (
-                <View
-                  key={item.id}
-                  style={styles.card}
-                >
-                  <TouchableOpacity
-                    style={styles.diveContent}
-                    onPress={() =>
-                      navigation.navigate('DiveDetail', {
-                        diveId: item.id,
-                      })
-                    }
-                  >
-                    <Text style={styles.title}>
-                      {item.location} –{' '}
-                      {new Date(item.date).toLocaleDateString()}
-                    </Text>
-
-                    <Text style={styles.mutedDetails}>
-                      Profundidad: {item.maxDepth}m
-                    </Text>
-
-                    <Text style={styles.mutedDetails}>
-                      Duración: {item.duration} min
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.shareButton}
-                    onPress={() =>
-                      navigation.navigate('InviteBuddy', {
-                        diveId: item.id,
-                      })
-                    }
-                  >
-                    <Text style={styles.shareButtonText}>
-                      Compartir
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )
-        )
-      ) : (
-        <FlatList
-          data={dives}
-          keyExtractor={item => item.id.toString()}
-          scrollEnabled={false}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <TouchableOpacity
-                style={styles.diveContent}
-                onPress={() =>
-                  navigation.navigate('DiveDetail', {
-                    diveId: item.id,
-                  })
-                }
-              >
-                <Text style={styles.country}>
-                  {item.country}
-                </Text>
-
-                <Text style={styles.title}>
-                  {item.location} –{' '}
-                  {new Date(item.date).toLocaleDateString()}
-                </Text>
-
-                <Text style={styles.mutedDetails}>
-                  Profundidad: {item.maxDepth}m
-                </Text>
-
-                <Text style={styles.mutedDetails}>
-                  Duración: {item.duration} min
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.shareButton}
-                onPress={() =>
-                  navigation.navigate('InviteBuddy', {
-                    diveId: item.id,
-                  })
-                }
-              >
-                <Text style={styles.shareButtonText}>
-                  Compartir
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        />
+        {loadError ? <View><Text accessibilityRole="alert" style={styles.statusText}>{loadError}</Text><TouchableOpacity accessibilityRole="button" style={styles.groupButton} onPress={fetchDives}><Text style={styles.groupButtonText}>Reintentar</Text></TouchableOpacity></View> : null}
+      </>}
+      ListEmptyComponent={loading ? <ActivityIndicator accessibilityLabel="Cargando inmersiones" color="#0077CC" /> : !loadError ? <Text style={styles.statusText}>Todavía no tienes inmersiones. Crea tu primera inmersión.</Text> : null}
+      renderSectionHeader={({ section }) => section.title ? (
+        <View style={styles.groupHeaderRow}>
+          <Text accessibilityRole="header" style={styles.groupHeader}>{section.title}</Text>
+          {CountryISO[section.title] && <CountryFlag isoCode={CountryISO[section.title]} size={18} style={styles.flag} />}
+        </View>
+      ) : null}
+      renderItem={({ item }) => (
+        <View style={styles.card}>
+          <TouchableOpacity accessibilityRole="button" style={styles.diveContent} onPress={() => navigation.navigate('DiveDetail', { diveId: item.id })}>
+            <Text style={styles.country}>{item.country}</Text>
+            <Text style={styles.title}>{item.location} – {new Date(item.date).toLocaleDateString()}</Text>
+            <Text style={styles.mutedDetails}>Profundidad: {item.maxDepth} m</Text>
+            <Text style={styles.mutedDetails}>Duración: {item.duration} min</Text>
+          </TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Compartir inmersión en ${item.location}`} style={styles.shareButton} onPress={() => navigation.navigate('InviteBuddy', { diveId: item.id })}>
+            <Text style={styles.shareButtonText}>Compartir</Text>
+          </TouchableOpacity>
+        </View>
       )}
-    </ScrollView>
+    />
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#f7f9fc',
   },
 
@@ -403,8 +320,8 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 1050,
     alignSelf: 'center',
-    paddingBottom: 100,
-    paddingHorizontal: Platform.OS === 'web' ? 30 : 0,
+    padding: 20,
+    paddingBottom: 40,
   },
 
   topInfo: {
@@ -482,7 +399,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderWidth: 1,
     borderColor: '#ddd',
-    marginHorizontal: -8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
@@ -506,7 +422,7 @@ const styles = StyleSheet.create({
   groupButton: {
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 12,
     backgroundColor: '#0077CC',
     borderRadius: 20,
     marginBottom: 10,
@@ -529,12 +445,16 @@ const styles = StyleSheet.create({
   },
 
   mutedDetails: {
-    fontSize: 11,
-    color: '#ccc',
+    fontSize: 14,
+    color: '#555',
     marginBottom: 2,
   },
 
+  statusText: { color: '#555', fontSize: 16, paddingVertical: 16 },
+
   shareButton: {
+    minHeight: 48,
+    justifyContent: 'center',
     marginTop: 10,
     backgroundColor: '#eee',
     padding: 10,
@@ -550,8 +470,8 @@ const styles = StyleSheet.create({
   profileButton: {
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 40,
-    minHeight: 40,
+    minWidth: 48,
+    minHeight: 48,
   },
 
   profileIcon: {
@@ -559,6 +479,7 @@ const styles = StyleSheet.create({
   },
 
   groupHeader: {
+    flexShrink: 1,
     fontSize: 20,
     fontWeight: 'bold',
     color: '#0077CC',
@@ -610,4 +531,3 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
-

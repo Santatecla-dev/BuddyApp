@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   TextInput,
   StyleSheet,
-  Alert,
+  ScrollView,
+  KeyboardAvoidingView,
+  useWindowDimensions,
   Text,
   TouchableOpacity,
   Platform,
@@ -33,17 +35,22 @@ const COUNTRIES = [
 ];
 
 export default function CreateDiveScreen({ navigation }: any) {
+  const { width, fontScale } = useWindowDimensions();
+  const compact = width / fontScale < 480;
+  const submitting = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [country, setCountry] = useState('');
-  const [location, setLocation] = useState('Balicasag Island');
+  const [location, setLocation] = useState('');
 
   const [day, setDay] = useState('');
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
   const [hour, setHour] = useState('');
 
-  const [maxDepth, setMaxDepth] = useState('30');
-  const [duration, setDuration] = useState('45');
-  const [notes, setNotes] = useState('Agua increíble');
+  const [maxDepth, setMaxDepth] = useState('');
+  const [duration, setDuration] = useState('');
+  const [notes, setNotes] = useState('');
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -52,144 +59,106 @@ export default function CreateDiveScreen({ navigation }: any) {
 
     if (!country) newErrors.country = 'Debes seleccionar un país';
 
-    if (!day || !month || !year) {
-      newErrors.date = 'Completa día, mes y año';
-    } else {
-      const d = parseInt(day);
-      const m = parseInt(month);
-      const h = hour ? parseInt(hour) : 0;
-
-      if (m < 1 || m > 12) {
-        newErrors.date = 'El mes debe estar entre 1 y 12';
-      } else {
-        const daysInMonth: Record<number, number> = {
-          1: 31, 2: 29, 3: 31, 4: 30, 5: 31, 6: 30,
-          7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31,
-        };
-        if (d < 1 || d > daysInMonth[m]) {
-          newErrors.date = 'El día no es válido para ese mes';
-        }
-      }
-
-      if (hour && (h < 0 || h > 23)) {
-        newErrors.hour = 'La hora debe estar entre 0 y 23';
-      }
-    }
+    if (!location.trim()) newErrors.location = 'Introduce el lugar de la inmersión';
+    const d = Number(day), m = Number(month), y = Number(year);
+    const date = new Date(0);
+    date.setFullYear(y, m - 1, d);
+    if (!/^\d{1,2}$/.test(day) || !/^\d{1,2}$/.test(month) || !/^\d{4}$/.test(year) || y < 1 || date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) newErrors.date = 'Introduce una fecha válida (DD/MM/AAAA)';
+    if (hour && (!/^\d{1,2}$/.test(hour) || Number(hour) > 23)) newErrors.hour = 'La hora debe estar entre 0 y 23';
+    if (!/^\d+$/.test(maxDepth) || !Number.isSafeInteger(Number(maxDepth)) || Number(maxDepth) <= 0) newErrors.maxDepth = 'Introduce una profundidad positiva en metros enteros';
+    if (!/^\d+$/.test(duration) || !Number.isSafeInteger(Number(duration)) || Number(duration) <= 0) newErrors.duration = 'Introduce una duración positiva en minutos enteros';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const createDive = async () => {
-    if (!validate()) return;
-
-    const dateObj = new Date(
-      parseInt(year),
-      parseInt(month) - 1,
-      parseInt(day),
-      hour ? parseInt(hour) : 0
-    );
+    if (submitting.current || !validate()) return;
+    submitting.current = true;
+    setSaving(true);
+    setSubmitError('');
+    const dateObj = new Date(0);
+    dateObj.setFullYear(Number(year), Number(month) - 1, Number(day));
+    dateObj.setHours(Number(hour || 0), 0, 0, 0);
 
     try {
       await API.post('/dives', {
         country,
-        location,
+        location: location.trim(),
         date: dateObj.toISOString(),
         maxDepth: parseInt(maxDepth),
         duration: parseInt(duration),
         notes,
       });
 
-      Alert.alert('Éxito', 'Inmersión creada');
       navigation.navigate('MyDives');
     } catch {
-      Alert.alert('Error', 'No se pudo crear la inmersión');
+      setSubmitError('No se pudo crear la inmersión. Inténtalo de nuevo.');
+    } finally {
+      submitting.current = false;
+      setSaving(false);
     }
   };
 
+  const error = (key: string) => errors[key] ? <Text accessibilityRole="alert" style={styles.errorText}>{errors[key]}</Text> : null;
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>País</Text>
-      <View style={styles.dropdown}>
-        <Picker selectedValue={country} onValueChange={(v) => setCountry(String(v))}>
-          <Picker.Item label="Selecciona un país..." value="" color="#999" />
-          {COUNTRIES.map((c) => (
-            <Picker.Item key={c} label={c} value={c} />
-          ))}
-        </Picker>
-      </View>
-      {errors.country && <Text style={styles.errorText}>{errors.country}</Text>}
-
-      <Text style={styles.label}>Lugar</Text>
-      <TextInput value={location} onChangeText={setLocation} style={styles.input} />
-
-      <Text style={styles.label}>Fecha</Text>
-      
-      <View style={styles.dateRow}>
-        <TextInput placeholder="DD" value={day} onChangeText={setDay} keyboardType="numeric" maxLength={2} style={[styles.input, styles.smallInput]} />
-        <TextInput placeholder="MM" value={month} onChangeText={setMonth} keyboardType="numeric" maxLength={2} style={[styles.input, styles.smallInput]} />
-        <TextInput placeholder="AAAA" value={year} onChangeText={setYear} keyboardType="numeric" maxLength={4} style={[styles.input, styles.fullInput]} />
-        <TextInput placeholder="HH" value={hour} onChangeText={setHour} keyboardType="numeric" maxLength={2} style={[styles.input, styles.smallInput]} />
-      </View>
-
-      {errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
-      {errors.hour && <Text style={styles.errorText}>{errors.hour}</Text>}
-
-      <Text style={styles.label}>Profundidad máxima</Text>
-      <TextInput value={maxDepth} onChangeText={setMaxDepth} style={styles.input} keyboardType="numeric" />
-
-      <Text style={styles.label}>Duración (minutos)</Text>
-      <TextInput value={duration} onChangeText={setDuration} style={styles.input} keyboardType="numeric" />
-
-     
-      <TouchableOpacity style={styles.mainButton} onPress={createDive}>
-        <Text style={styles.buttonText}>Crear inmersión</Text>
-      </TouchableOpacity>
-    </View>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+        <Text style={styles.label}>País</Text>
+        <View style={Platform.OS === 'web' ? undefined : styles.dropdown}>
+          <Picker accessibilityLabel="País" selectedValue={country} onValueChange={v => setCountry(String(v))} mode="dialog" prompt="Selecciona un país" style={Platform.OS === 'web' ? styles.input : styles.nativePicker}>
+            <Picker.Item label="Selecciona un país..." value="" />
+            {COUNTRIES.map(c => <Picker.Item key={c} label={c} value={c} />)}
+          </Picker>
+        </View>
+        {error('country')}
+        <Text style={styles.label}>Lugar</Text>
+        <TextInput accessibilityLabel="Lugar" placeholder="Nombre del punto de buceo" value={location} onChangeText={setLocation} style={styles.input} />
+        {error('location')}
+        <Text style={styles.label}>Fecha y hora local</Text>
+        <View style={styles.dateRow}>
+          {[
+            { label: 'Día', placeholder: 'DD', value: day, set: setDay, length: 2 },
+            { label: 'Mes', placeholder: 'MM', value: month, set: setMonth, length: 2 },
+            { label: 'Año', placeholder: 'AAAA', value: year, set: setYear, length: 4 },
+            { label: 'Hora (opcional)', placeholder: 'HH', value: hour, set: setHour, length: 2 },
+          ].map(field => <View key={field.label} style={[styles.dateField, compact && styles.compactField]}>
+            <Text style={styles.fieldLabel}>{field.label}</Text>
+            <TextInput accessibilityLabel={field.label} placeholder={field.placeholder} value={field.value} onChangeText={field.set} keyboardType="number-pad" maxLength={field.length} style={styles.input} />
+          </View>)}
+        </View>
+        {error('date')}{error('hour')}
+        <Text style={styles.label}>Profundidad máxima (m)</Text>
+        <TextInput accessibilityLabel="Profundidad máxima en metros" placeholder="30" value={maxDepth} onChangeText={setMaxDepth} style={styles.input} keyboardType="number-pad" />
+        {error('maxDepth')}
+        <Text style={styles.label}>Duración (minutos)</Text>
+        <TextInput accessibilityLabel="Duración en minutos" placeholder="45" value={duration} onChangeText={setDuration} style={styles.input} keyboardType="number-pad" />
+        {error('duration')}
+        <Text style={styles.label}>Notas (opcional)</Text>
+        <TextInput accessibilityLabel="Notas" value={notes} onChangeText={setNotes} style={[styles.input, styles.notes]} multiline />
+        {submitError ? <Text accessibilityRole="alert" style={styles.errorText}>{submitError}</Text> : null}
+        <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: saving, busy: saving }} disabled={saving} style={[styles.mainButton, saving && styles.disabled]} onPress={createDive}>
+          <Text style={styles.buttonText}>{saving ? 'Creando…' : 'Crear inmersión'}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  label: { fontWeight: 'bold', marginBottom: 2, color: '#333' }, // Margen inferior reducido sutilmente
-  dropdown: {
-    borderWidth: 1,
-    borderColor: '#0077CC',
-    borderRadius: 30,
-    backgroundColor: '#fff',
-    marginBottom: 4,
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#0077CC',
-    borderRadius: 30,
-    paddingHorizontal: 15,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8, // Padding vertical modificado
-    marginBottom: 4,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginHorizontal: -5, 
-  },
-  smallInput: {
-    width: '55%',
-    textAlign: 'center',
-  },
-  fullInput: {
-    width: '100%',
-    textAlign: 'center',
-  },
-  errorText: { color: 'red', fontSize: 11, marginBottom: 6 },
-  mainButton: {
-    backgroundColor: '#0077CC',
-    padding: 15,
-    borderRadius: 30,
-    alignItems: 'center',
-    marginTop: 10,
-    marginHorizontal: 30, 
-  },
-  buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  container: { flex: 1, backgroundColor: '#f7f9fc' },
+  content: { width: '100%', maxWidth: 1050, alignSelf: 'center', padding: 20, paddingBottom: 40 },
+  label: { fontWeight: 'bold', fontSize: 16, marginTop: 16, marginBottom: 8, color: '#333' },
+  fieldLabel: { fontSize: 14, color: '#555', marginBottom: 6 },
+  dropdown: { borderWidth: 1, borderColor: '#0077CC', borderRadius: 24, backgroundColor: '#fff' },
+  nativePicker: { width: '100%', color: '#333', minHeight: 52 },
+  input: { width: '100%', minWidth: 0, minHeight: 52, backgroundColor: '#fff', color: '#333', fontSize: 16, borderWidth: 1, borderColor: '#0077CC', borderRadius: 24, paddingHorizontal: 15, paddingVertical: 12 },
+  dateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  dateField: { flexBasis: 0, flexGrow: 1, minWidth: 0 },
+  compactField: { flexBasis: '40%' },
+  notes: { minHeight: 104, textAlignVertical: 'top' },
+  errorText: { color: '#B42318', fontSize: 14, marginTop: 6 },
+  mainButton: { backgroundColor: '#0077CC', minHeight: 48, padding: 15, borderRadius: 30, alignItems: 'center', marginTop: 24 },
+  disabled: { opacity: 0.65 },
+  buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16, textAlign: 'center' },
 });
