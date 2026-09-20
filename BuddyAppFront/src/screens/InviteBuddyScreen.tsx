@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
 import API from '../api/api';
 
 export default function InviteBuddyScreen({ route }: any) {
   const { diveId } = route.params;
   const [userId, setUserId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [buttonText, setButtonText] = useState('Enviar invitación');
+  const [buttonText, setButtonText] = useState('Send invitation');
   const [buttonDisabled, setButtonDisabled] = useState(false);
-  const [buttonSent, setButtonSent] = useState(false); // estado para color
+  const [buttonSent, setButtonSent] = useState(false);
 
   const inviteBuddy = async () => {
     if (!userId.trim()) {
-      setErrorMessage('Introduce un ID de usuario');
+      setErrorMessage('Please enter a user ID');
       clearErrorAfterTimeout();
       return;
     }
@@ -21,33 +21,33 @@ export default function InviteBuddyScreen({ route }: any) {
       setButtonDisabled(true);
       await API.post('/dives/invite', {
         diveId,
-        invitedUserId: parseInt(userId),
+        invitedUserId: parseInt(userId, 10),
       });
 
-      setButtonText('Invitación enviada');
+      setButtonText('Invitation sent');
       setButtonSent(true);
       setUserId('');
 
       setTimeout(() => {
-        setButtonText('Enviar invitación');
+        setButtonText('Send invitation');
         setButtonSent(false);
       }, 2000);
     } catch (err: any) {
       console.log(err);
 
       if (err.response?.status === 400) {
-        const backendMsg = err.response.data.message;
-        if (backendMsg.includes('El usuario ya está en la inmersión')) {
-          setErrorMessage('El usuario ya está en la inmersión');
-        } else if (backendMsg.includes('Ya se ha enviado una invitación')) {
-          setErrorMessage('Invitación ya ha sido enviada');
-        } else if (backendMsg.includes('user not found')) {
-          setErrorMessage('Código de usuario incorrecto');
+        const backendMsg = err.response.data.message || '';
+        if (backendMsg.includes('El usuario ya está en la inmersión') || backendMsg.toLowerCase().includes('already in')) {
+          setErrorMessage('User is already part of this dive');
+        } else if (backendMsg.includes('Ya se ha enviado una invitación') || backendMsg.toLowerCase().includes('already sent')) {
+          setErrorMessage('Invitation has already been sent');
+        } else if (backendMsg.includes('user not found') || backendMsg.toLowerCase().includes('not found')) {
+          setErrorMessage('User ID not found');
         } else {
-          setErrorMessage('Error al enviar la invitación');
+          setErrorMessage('Error sending invitation');
         }
       } else {
-        setErrorMessage('Error al enviar la invitación');
+        setErrorMessage('Error sending invitation');
       }
 
       clearErrorAfterTimeout();
@@ -61,40 +61,66 @@ export default function InviteBuddyScreen({ route }: any) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Invitar buddy</Text>
-
-      <TextInput
-        placeholder="ID del usuario"
-        value={userId}
-        onChangeText={setUserId}
-        keyboardType="numeric"
-        style={styles.input} // 🔹 ahora con fondo blanco y borde azul
-      />
-
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-
-      <TouchableOpacity
-        style={[
-          styles.button,
-          Platform.OS === 'web' && styles.webButton,
-          buttonDisabled && { opacity: 0.6 },
-          buttonSent && { backgroundColor: '#28A745' }, // verde al enviar
-        ]}
-        onPress={inviteBuddy}
-        disabled={buttonDisabled}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.buttonText}>{buttonText}</Text>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.content}>
+          <Text style={styles.title}>Invite buddy</Text>
+
+          <TextInput
+            placeholder="User ID"
+            value={userId}
+            onChangeText={setUserId}
+            keyboardType="numeric"
+            style={styles.input}
+            accessibilityLabel="User ID"
+          />
+
+          {errorMessage ? (
+            <Text accessibilityRole="alert" style={styles.errorText}>
+              {errorMessage}
+            </Text>
+          ) : null}
+
+          <TouchableOpacity
+            style={[
+              styles.button,
+              buttonDisabled && { opacity: 0.6 },
+              buttonSent && { backgroundColor: '#28A745' },
+            ]}
+            onPress={inviteBuddy}
+            disabled={buttonDisabled}
+            accessibilityRole="button"
+          >
+            <Text style={styles.buttonText}>{buttonText}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: '#f7f9fc',
+  },
+
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    padding: 20,
+  },
+
+  content: {
+    width: '100%',
+    maxWidth: 500,
+    alignSelf: 'center',
   },
 
   title: {
@@ -102,26 +128,33 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#0077CC',
   },
 
   input: {
     borderWidth: 1,
-    borderColor: '#0077CC', // 🔹 borde azul
-    backgroundColor: 'white', // 🔹 fondo blanco
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 10,
+    borderColor: '#0077CC',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 14,
+    fontSize: 16,
+    color: '#333',
   },
 
   errorText: {
-    color: 'red',
-    marginBottom: 10,
+    color: '#D32F2F',
+    marginBottom: 14,
     textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '500',
   },
 
   button: {
     backgroundColor: '#0077CC',
-    padding: 15,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
     borderRadius: 30,
     alignItems: 'center',
     ...Platform.select({
@@ -135,10 +168,6 @@ const styles = StyleSheet.create({
         elevation: 5,
       },
     }),
-  },
-
-  webButton: {
-    marginTop: -18,
   },
 
   buttonText: {
