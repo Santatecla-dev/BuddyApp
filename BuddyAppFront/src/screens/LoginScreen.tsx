@@ -1,36 +1,49 @@
-import React, { useState } from 'react';
-import { View, TextInput, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { TextInput, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
 import API from '../api/api';
+import FormScreen from '../components/FormScreen';
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('buddy@demo.com');
   const [password, setPassword] = useState('123456');
   const [error, setError] = useState('');
 
+  const [loading, setLoading] = useState(false);
+  const inFlight = useRef(false);
   const login = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setLoading(true);
     try {
       setError('');
       const res = await API.post('/auth/login', { email, password });
       const token = res.data.accessToken;
       API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      navigation.navigate('MyDives');
+      navigation.reset({ index: 0, routes: [{ name: 'MyDives' }] });
     } catch (err: any) {
       console.log('Error login:', err.response ? err.response.data : err.message);
-      setError('Credenciales incorrectas');
+      setError('Could not sign in. Check your email and password and try again.');
+    } finally {
+      inFlight.current = false;
+      setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
+    <FormScreen>
       {/* LOGO */}
       <Image
-        source={{ uri: '/images/buddy.png' }} // 🔹 URL relativa a public
-        style={[styles.logo, Platform.OS === 'web' && styles.webLogo]}
+        source={require('../assets/Buddy.png')}
+        accessibilityLabel="Buddy"
+        style={styles.logo}
         resizeMode="contain"
       />
 
       <Text style={styles.label}>Email</Text>
       <TextInput
+        accessibilityLabel="Email"
+        autoComplete="email"
+        placeholderTextColor="#596579"
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
@@ -39,8 +52,12 @@ export default function LoginScreen({ navigation }: any) {
         autoCapitalize="none"
       />
 
-      <Text style={styles.label}>Contraseña</Text>
+      <Text style={styles.label}>Password</Text>
       <TextInput
+        accessibilityLabel="Password"
+        autoComplete="current-password"
+        onSubmitEditing={login}
+        placeholderTextColor="#596579"
         placeholder="Password"
         value={password}
         onChangeText={setPassword}
@@ -48,37 +65,32 @@ export default function LoginScreen({ navigation }: any) {
         secureTextEntry
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
 
-      <TouchableOpacity style={styles.button} onPress={login}>
-        <Text style={styles.buttonText}>Login</Text>
+      <TouchableOpacity accessibilityRole="button" disabled={loading} accessibilityState={{ disabled: loading, busy: loading }} style={[styles.button, loading && { opacity: 0.6 }]} onPress={login}>
+        <Text style={styles.buttonText}>{loading ? 'Signing in…' : 'Sign in'}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={[styles.button, styles.registerButton]}
         onPress={() => navigation.navigate('Register')}
       >
-        <Text style={styles.buttonText}>Registrarse</Text>
+        <Text style={styles.buttonText}>Create account</Text>
       </TouchableOpacity>
-    </View>
+    </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20 },
 
   logo: {
-    width: 150,
-    height: 150,
+    width: '100%',
+    maxWidth: 240,
+    height: 160,
     alignSelf: 'center',
-    marginBottom: 30,
+    marginBottom: 12,
   },
 
-  webLogo: {
-    width: 300,
-    height: 260,
-    marginBottom: 62,
-  },
 
   label: {
     fontWeight: 'bold',
@@ -87,6 +99,9 @@ const styles = StyleSheet.create({
   },
 
   input: {
+    color: '#243247',
+    fontSize: 16,
+    minHeight: 48,
     borderWidth: 1,
     borderColor: '#0077CC',
     backgroundColor: 'white',
@@ -115,7 +130,7 @@ const styles = StyleSheet.create({
   },
 
   registerButton: {
-    backgroundColor: '#00A8A8',
+    backgroundColor: '#007F83',
   },
 
   buttonText: {
@@ -125,7 +140,7 @@ const styles = StyleSheet.create({
   },
 
   error: {
-    color: 'red',
+    color: '#B42318',
     marginBottom: 10,
     textAlign: 'center',
   },

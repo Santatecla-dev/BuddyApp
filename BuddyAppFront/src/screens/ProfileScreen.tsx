@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Platform,
 } from 'react-native';
 import API from '../api/api';
 
@@ -37,6 +36,7 @@ export default function ProfileScreen({ route }: any) {
   const [divesWithMe, setDivesWithMe] = useState<number | null>(null); // 🔹 nuevo
 
   const fetchProfile = async () => {
+    setErrorMessage('');
     try {
       const res = isOwnProfile
         ? await API.get('/users/me')
@@ -50,13 +50,13 @@ export default function ProfileScreen({ route }: any) {
       setTotalDives(data.totalDives);
 
       // 🔹 calcular inmersiones contigo si no es tu perfil
-if (!isOwnProfile) {
-  const sharedRes = await API.get(`/users/${viewedUserId}/shared-dives`);
-  setDivesWithMe(sharedRes.data.sharedDives);
-}
+      if (!isOwnProfile) {
+        const sharedRes = await API.get(`/users/${viewedUserId}/shared-dives`);
+        setDivesWithMe(sharedRes.data.sharedDives);
+      }
     } catch (err) {
       console.log('Error cargando perfil o inmersiones', err);
-      setErrorMessage('No se pudieron cargar las inmersiones');
+      setErrorMessage('Could not load the profile or shared dives.');
     }
   };
 
@@ -68,7 +68,11 @@ if (!isOwnProfile) {
     fetchProfile();
   }, [viewedUserId]);
 
+  const [saving, setSaving] = useState(false);
   const saveProfile = async () => {
+    if (saving) return;
+    setSaving(true);
+    setErrorMessage('');
     try {
       const certsArray = certificationsText
         .split(',')
@@ -78,73 +82,75 @@ if (!isOwnProfile) {
       await API.patch('/users/me', { agency, certifications: certsArray });
 
       setIsEditing(false);
-      setTempMessage('Perfil actualizado');
-      setTimeout(() => setTempMessage(''), 3000);
+      setTempMessage('Profile updated.');
 
       fetchProfile();
     } catch (err) {
       console.log(err);
-      setErrorMessage('Error al actualizar perfil');
-      setTimeout(() => setErrorMessage(''), 3000);
+      setErrorMessage('Could not update your profile.');
+    } finally {
+      setSaving(false);
     }
   };
 
   if (!profile) {
     return (
       <View style={styles.container}>
-        <Text accessibilityRole={errorMessage ? 'alert' : undefined}>{errorMessage || 'Cargando perfil...'}</Text>
-        {errorMessage ? <TouchableOpacity accessibilityRole="button" style={styles.editButton} onPress={fetchProfile}><Text style={styles.editButtonText}>Reintentar</Text></TouchableOpacity> : null}
+        <Text accessibilityRole={errorMessage ? 'alert' : undefined}>{errorMessage || 'Loading profile...'}</Text>
+        {errorMessage ? <TouchableOpacity accessibilityRole="button" style={styles.editButton} onPress={fetchProfile}><Text style={styles.editButtonText}>Retry</Text></TouchableOpacity> : null}
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView style={{ flex: 1, backgroundColor: '#f7f9fc' }} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
       <Text style={styles.title}>
-        {isOwnProfile ? 'Mi perfil' : 'Perfil del buddy'}
+        {isOwnProfile ? 'My profile' : 'Buddy profile'}
       </Text>
 
-      <View style={[styles.card, Platform.OS === 'web' && styles.webCard]}>
+      <View style={styles.card}>
         <View style={styles.topRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Nombre completo</Text>
-            <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>{profile.name}</Text>
+          <View style={{ flexGrow: 1, flexBasis: 220, minWidth: 0 }}>
+            <Text style={styles.label}>Full name</Text>
+            <Text style={styles.value}>{profile.name}</Text>
 
             <Text style={styles.label}>Email</Text>
-            <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>{profile.email}</Text>
+            <Text style={styles.value}>{profile.email}</Text>
 
             <Text style={styles.label}>Diver ID</Text>
-            <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>{profile.id}</Text>
+            <Text style={styles.value}>{profile.id}</Text>
 
-            <Text style={styles.label}>Inmersiones totales</Text>
-            <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>
-              {totalDives !== null ? totalDives : 'Cargando...'}
+            <Text style={styles.label}>Total dives</Text>
+            <Text style={styles.value}>
+              {totalDives !== null ? totalDives : 'Loading...'}
             </Text>
           </View>
 
           {!isOwnProfile && divesWithMe !== null && (
             <View style={styles.divesWithMe}>
-              <Text style={styles.divesWithMeLabel}>Inmersiones contigo</Text>
+              <Text style={styles.divesWithMeLabel}>Dives together</Text>
               <Text style={styles.divesWithMeValue}>{divesWithMe}</Text>
             </View>
           )}
         </View>
 
-        <Text style={styles.label}>Agencia</Text>
+        <Text style={styles.label}>Agency</Text>
         {isEditing ? (
           <TextInput
+            accessibilityLabel="Agency"
             value={agency}
             onChangeText={setAgency}
             style={[styles.input, styles.inputEditable]}
             placeholder="SSI, PADI, etc."
           />
         ) : (
-          <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>{profile.agency || 'No especificada'}</Text>
+          <Text style={styles.value}>{profile.agency || 'Not specified'}</Text>
         )}
 
-        <Text style={styles.label}>Titulaciones</Text>
+        <Text style={styles.label}>Certifications</Text>
         {isEditing ? (
           <TextInput
+            accessibilityLabel="Certifications, separated by commas"
             value={certificationsText}
             onChangeText={setCertificationsText}
             style={[styles.input, styles.inputEditable]}
@@ -152,36 +158,38 @@ if (!isOwnProfile) {
           />
         ) : certifications.length > 0 ? (
           certifications.map((c, i) => (
-            <Text key={i} style={[styles.value, Platform.OS === 'web' && styles.webValue]}>
+            <Text key={i} style={styles.value}>
               • {c}
             </Text>
           ))
         ) : (
-          <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>No especificadas</Text>
+          <Text style={styles.value}>Not specified</Text>
         )}
       </View>
 
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-      {tempMessage ? <Text style={styles.successText}>{tempMessage}</Text> : null}
+      {errorMessage ? <Text accessibilityRole="alert" style={styles.errorText}>{errorMessage}</Text> : null}
+      {tempMessage ? <Text accessibilityLiveRegion="polite" style={styles.successText}>{tempMessage}</Text> : null}
 
       {isOwnProfile ? (
-        <TouchableOpacity
-          style={[styles.editButton, isEditing && { backgroundColor: '#00A8A8' }]}
-          onPress={isEditing ? saveProfile : () => setIsEditing(true)}
+        <TouchableOpacity accessibilityRole="button"
+          style={[styles.editButton, isEditing && { backgroundColor: '#007F83' }]}
+          disabled={saving}
+          accessibilityState={{ disabled: saving, busy: saving }}
+          onPress={isEditing ? saveProfile : () => { setTempMessage(''); setIsEditing(true); }}
         >
           <Text style={styles.editButtonText}>
-            {isEditing ? 'Guardar cambios' : 'Editar perfil'}
+            {saving ? 'Saving…' : isEditing ? 'Save changes' : 'Edit profile'}
           </Text>
         </TouchableOpacity>
       ) : (
-        <Text style={styles.readOnlyNote}>Este perfil es solo de lectura</Text>
+        <Text style={styles.readOnlyNote}>This profile is read-only</Text>
       )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
+  container: { width: '100%', maxWidth: 1050, alignSelf: 'center', padding: 20, paddingBottom: 40 },
 
   title: { fontSize: 26, fontWeight: 'bold', marginBottom: 20, color: '#0077CC' },
 
@@ -194,12 +202,8 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
 
-  webCard: {
-    overflow: 'hidden',
-    boxShadow: '0 12px 24px rgba(0, 0, 0, 0.34)',
-  } as any,
 
-  topRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
+  topRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start', marginBottom: 10 },
 
   divesWithMe: {
     backgroundColor: '#E0F7FA',
@@ -207,7 +211,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 10,
+
     minWidth: 80,
   },
 
@@ -215,11 +219,13 @@ const styles = StyleSheet.create({
   divesWithMeValue: { fontSize: 18, fontWeight: 'bold', color: '#0077CC' },
 
   label: { fontWeight: 'bold', marginTop: 10, color: '#555' },
-  value: { fontSize: 16, marginTop: 4 },
+  value: { color: '#243247', fontSize: 16, marginTop: 4 },
 
-  webValue: { color: '#fff' },
 
   input: {
+    color: '#243247',
+    fontSize: 16,
+    minHeight: 48,
     borderWidth: 1,
     borderColor: '#ccc',
     padding: 12,
@@ -241,7 +247,7 @@ const styles = StyleSheet.create({
 
   readOnlyNote: { textAlign: 'center', color: '#777', fontStyle: 'italic', marginTop: 10 },
 
-  errorText: { color: 'red', marginBottom: 10, textAlign: 'center' },
+  errorText: { color: '#B42318', marginBottom: 10, textAlign: 'center' },
 
   successText: { color: 'green', marginBottom: 10, textAlign: 'center' },
 });

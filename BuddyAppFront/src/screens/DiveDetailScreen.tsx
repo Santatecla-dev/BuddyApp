@@ -11,6 +11,7 @@ import {
   ScrollView, 
 } from 'react-native';
 import API from '../api/api';
+import { countryLabel } from '../utils/countries';
 import { DiveBuddy, Dive } from '../types';
 
 export default function DiveDetailScreen({ route, navigation }: any) {
@@ -30,7 +31,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
       const res = await API.get(`/dives/my`);
       const myDive = res.data.find((d: Dive) => d.id === diveId);
       if (!myDive) {
-        setLoadError('Esta inmersión ya no está disponible.');
+        setLoadError('This dive is no longer available.');
         return;
       }
       setDive(myDive);
@@ -43,7 +44,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
         setMyNotes(notesRes.data.notes || '');
       } catch {}
     } catch (err) {
-      setLoadError('No se pudo cargar la inmersión.');
+      setLoadError('Could not load the dive.');
     }
   };
 
@@ -52,7 +53,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
       const authHeader = API.defaults.headers.common['Authorization'];
       if (typeof authHeader === 'string') {
         const token = authHeader.split(' ')[1];
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
         setMyUserId(payload.userId);
       }
     } catch (err) {
@@ -75,11 +76,11 @@ export default function DiveDetailScreen({ route, navigation }: any) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      console.error('Error al guardar notas');
+      console.error('Could not save notes.');
       if (Platform.OS === 'web') {
-        window.alert('Error: No se pudieron guardar las notas');
+        window.alert('Error: Could not save notes.');
       } else {
-        Alert.alert('Error', 'No se pudieron guardar las notas');
+        Alert.alert('Error', 'Could not save notes.');
       }
     } finally {
       setSavingNotes(false);
@@ -87,8 +88,8 @@ export default function DiveDetailScreen({ route, navigation }: any) {
   };
 
   const confirmLeaveDive = () => {
-    const title = 'Salir de la inmersión';
-    const message = '¿Seguro que quieres salir de esta inmersión?';
+    const title = 'Leave dive';
+    const message = 'Are you sure you want to leave this dive?';
 
     if (Platform.OS === 'web') {
       const confirmed = window.confirm(`${title}\n\n${message}`);
@@ -100,8 +101,8 @@ export default function DiveDetailScreen({ route, navigation }: any) {
         title,
         message,
         [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Salir', style: 'destructive', onPress: leaveDive },
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Leave', style: 'destructive', onPress: leaveDive },
         ]
       );
     }
@@ -113,9 +114,9 @@ export default function DiveDetailScreen({ route, navigation }: any) {
       navigation.navigate('MyDives', { removeDiveId: diveId });
     } catch {
       if (Platform.OS === 'web') {
-        window.alert('Error: No se pudo salir de la inmersión');
+        window.alert('Error: Could not leave the dive.');
       } else {
-        Alert.alert('Error', 'No se pudo salir de la inmersión');
+        Alert.alert('Error', 'Could not leave the dive.');
       }
     }
   };
@@ -123,8 +124,8 @@ export default function DiveDetailScreen({ route, navigation }: any) {
   if (!dive) {
     return (
       <View style={styles.container}>
-        <Text accessibilityRole={loadError ? 'alert' : undefined} style={styles.loading}>{loadError || 'Cargando inmersión…'}</Text>
-        {loadError ? <TouchableOpacity accessibilityRole="button" style={styles.shareButton} onPress={fetchDive}><Text style={styles.shareButtonText}>Reintentar</Text></TouchableOpacity> : null}
+        <Text accessibilityRole={loadError ? 'alert' : undefined} style={styles.loading}>{loadError || 'Loading dive…'}</Text>
+        {loadError ? <TouchableOpacity accessibilityRole="button" style={styles.shareButton} onPress={fetchDive}><Text style={styles.shareButtonText}>Retry</Text></TouchableOpacity> : null}
       </View>
     );
   }
@@ -132,23 +133,24 @@ export default function DiveDetailScreen({ route, navigation }: any) {
   return (
     
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {loadError ? <Text accessibilityRole="alert" style={{ color: '#B42318', marginBottom: 12 }}>{loadError}</Text> : null}
       {/* CARD PRINCIPAL */}
       <View style={styles.card}>
-        <Text style={styles.country}>{dive.country}</Text>
+        <Text style={styles.country}>{countryLabel(dive.country)}</Text>
 
         {}
         <View style={styles.cardHeader}>
           <Text style={styles.title}>{dive.location}</Text>
 
-          <Pressable onPress={confirmLeaveDive}>
-            <Text style={styles.leaveText}>Salir</Text>
+          <Pressable accessibilityRole="button" style={{ minHeight: 48, minWidth: 48, justifyContent: 'center', alignItems: 'center', marginLeft: 12 }} onPress={confirmLeaveDive}>
+            <Text style={styles.leaveText}>Leave</Text>
           </Pressable>
         </View>
 
         {}
         <Text style={styles.date}>
-          {new Date(dive.date).toLocaleDateString()} ·{' '}
-          {new Date(dive.date).toLocaleTimeString([], {
+          {new Date(dive.date).toLocaleDateString('en-GB')} ·{' '}
+          {new Date(dive.date).toLocaleTimeString('en-GB', {
             hour: '2-digit',
             minute: '2-digit',
           })}
@@ -157,39 +159,39 @@ export default function DiveDetailScreen({ route, navigation }: any) {
         <View style={styles.statsRow}>
           <View style={[styles.statBox, styles.shadow]}>
             <Text style={styles.statValue}>{dive.maxDepth} m</Text>
-            <Text style={styles.statLabel}>Profundidad</Text>
+            <Text style={styles.statLabel}>Depth</Text>
           </View>
 
           <View style={[styles.statBox, styles.shadow]}>
             <Text style={styles.statValue}>{dive.duration} min</Text>
-            <Text style={styles.statLabel}>Duración</Text>
+            <Text style={styles.statLabel}>Duration</Text>
           </View>
         </View>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.shareButton}
           onPress={() => navigation.navigate('InviteBuddy', { diveId })}
         >
-          <Text style={styles.shareButtonText}>Compartir inmersión</Text>
+          <Text style={styles.shareButtonText}>Share dive</Text>
         </TouchableOpacity>
       </View>
 
       {/* NOTAS */}
       {}
       <View style={[styles.notesCard, styles.shadow]}>
-        <Text style={styles.sectionTitle}>Notas</Text>
+        <Text style={styles.sectionTitle}>Notes</Text>
 
         <TextInput
-          accessibilityLabel="Notas personales"
+          accessibilityLabel="Personal notes"
           value={myNotes}
-          onChangeText={setMyNotes}
+          onChangeText={value => { setMyNotes(value); setSaved(false); }}
           multiline
           style={styles.notesInput}
         />
 
         <TouchableOpacity accessibilityRole="button" disabled={savingNotes} accessibilityState={{ disabled: savingNotes, busy: savingNotes }} style={styles.saveButton} onPress={saveMyNotes}>
           <Text style={styles.saveButtonText}>
-            {savingNotes ? 'Guardando…' : saved ? 'Guardado ✓' : 'Guardar notas'}
+            {savingNotes ? 'Saving…' : saved ? 'Saved ✓' : 'Save notes'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -202,9 +204,8 @@ export default function DiveDetailScreen({ route, navigation }: any) {
           const isMe = item.userId === myUserId;
 
           return (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={item.userId}
-              accessibilityRole="button"
               onPress={() => {
                 navigation.navigate('Profile', { userId: isMe ? undefined : item.userId });
               }}
@@ -217,7 +218,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
             >
               <View style={styles.buddyRow}>
                 <Text style={styles.buddyName}>{item.name}</Text>
-                {isMe && <Text style={styles.meBadge}>Tú</Text>}
+                {isMe && <Text style={styles.meBadge}>You</Text>}
               </View>
               <Text style={styles.buddyEmail}>{item.email}</Text>
             </TouchableOpacity>
@@ -225,7 +226,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
         })}
         {buddies.length === 0 && (
           <Text style={styles.emptyText}>
-            Aún no hay buddies en esta inmersión 🤿
+            There are no buddies in this dive yet.
           </Text>
         )}
     </ScrollView>
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
 
   saveButton: {
     marginTop: 12,
-    backgroundColor: '#00A8A8',
+    backgroundColor: '#007F83',
     padding: 12,
     borderRadius: 25,
     alignItems: 'center',
@@ -330,7 +331,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  buddyName: { fontWeight: 'bold', fontSize: 15 },
+  buddyName: { flexShrink: 1, fontWeight: 'bold', fontSize: 15 },
   buddyEmail: { fontSize: 13, color: '#666' },
 
   meBadge: {

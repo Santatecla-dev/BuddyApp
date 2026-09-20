@@ -13,26 +13,8 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import API from '../api/api';
 
-const COUNTRIES = [
-  'Afganistán','Albania','Argelia','Andorra','Angola','Antigua y Barbuda','Argentina','Armenia','Australia','Austria','Azerbaiyán',
-  'Bahamas','Baréin','Bangladés','Barbados','Bielorrusia','Bélgica','Belice','Benín','Bután','Bolivia','Bosnia y Herzegovina',
-  'Botsuana','Brasil','Brunéi','Bulgaria','Burkina Faso','Burundi','Cabo Verde','Camboya','Camerún','Canadá','República Centroafricana',
-  'Chad','Chile','China','Colombia','Comoras','Congo','Costa de Marfil','Costa Rica','Croacia','Cuba','Chipre','República Checa',
-  'Dinamarca','Yibuti','Dominica','República Dominicana','Ecuador','Egipto','El Salvador','Guinea Ecuatorial','Eritrea','Estonia',
-  'Esuatini','Etiopía','Fiyi','Finlandia','Francia','Gabón','Gambia','Georgia','Alemania','Ghana','Grecia','Granada','Guatemala',
-  'Guinea','Guinea-Bisáu','Guyana','Haití','Honduras','Hungría','Islandia','India','Indonesia','Irán','Irak','Irlanda','Israel',
-  'Italia','Jamaica','Japón','Jordania','Kazajistán','Kenia','Kiribati','Kuwait','Kirguistán','Laos','Letonia','Líbano','Lesoto',
-  'Liberia','Libia','Liechtenstein','Lituania','Luxemburgo','Madagascar','Malaui','Malasia','Maldivas','Malí','Malta','Islas Marshall',
-  'Mauritania','Mauricio','México','Estados Federados de Micronesia','Moldavia','Mónaco','Mongolia','Montenegro','Marruecos',
-  'Mozambique','Birmania','Namibia','Nauru','Nepal','Países Bajos','Nueva Zelanda','Nicaragua','Níger','Nigeria','Corea del Norte',
-  'Macedonia del Norte','Noruega','Omán','Pakistán','Palaos','Panamá','Papúa Nueva Guinea','Paraguay','Perú','Filipinas','Polonia',
-  'Portugal','Catar','Rumanía','Federación Rusa','Ruanda','San Cristóbal y Nieves','Santa Lucía','San Vicente y las Granadinas',
-  'Samoa','San Marino','Santo Tomé y Príncipe','Arabia Saudita','Senegal','Serbia','Seychelles','Sierra Leona','Singapur','Eslovaquia',
-  'Eslovenia','Islas Salomón','Somalia','Sudáfrica','Sudán del Sur','España','Sri Lanka','Sudán','Surinam','Suecia','Suiza','Siria',
-  'Tayikistán','Tailandia','Timor-Leste','Togo','Tonga','Trinidad y Tobago','Túnez','Turquía','Turkmenistán','Tuvalu','Uganda',
-  'Ucrania','Emiratos Árabes Unidos','Reino Unido','República Unida de Tanzania','Estados Unidos de América','Uruguay','Uzbekistán',
-  'Vanuatu','Venezuela','Vietnam','Yemen','Zambia','Zimbabue','Taiwán'
-];
+import { countries } from '../utils/countries';
+const sortedCountries = [...countries].sort((a, b) => a.label.localeCompare(b.label, 'en'));
 
 export default function CreateDiveScreen({ navigation }: any) {
   const { width, fontScale } = useWindowDimensions();
@@ -57,16 +39,16 @@ export default function CreateDiveScreen({ navigation }: any) {
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!country) newErrors.country = 'Debes seleccionar un país';
+    if (!country) newErrors.country = 'Select a country.';
 
-    if (!location.trim()) newErrors.location = 'Introduce el lugar de la inmersión';
+    if (!location.trim()) newErrors.location = 'Enter the dive location.';
     const d = Number(day), m = Number(month), y = Number(year);
     const date = new Date(0);
     date.setFullYear(y, m - 1, d);
-    if (!/^\d{1,2}$/.test(day) || !/^\d{1,2}$/.test(month) || !/^\d{4}$/.test(year) || y < 1 || date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) newErrors.date = 'Introduce una fecha válida (DD/MM/AAAA)';
-    if (hour && (!/^\d{1,2}$/.test(hour) || Number(hour) > 23)) newErrors.hour = 'La hora debe estar entre 0 y 23';
-    if (!/^\d+$/.test(maxDepth) || !Number.isSafeInteger(Number(maxDepth)) || Number(maxDepth) <= 0) newErrors.maxDepth = 'Introduce una profundidad positiva en metros enteros';
-    if (!/^\d+$/.test(duration) || !Number.isSafeInteger(Number(duration)) || Number(duration) <= 0) newErrors.duration = 'Introduce una duración positiva en minutos enteros';
+    if (!/^\d{1,2}$/.test(day) || !/^\d{1,2}$/.test(month) || !/^\d{4}$/.test(year) || y < 1 || date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) newErrors.date = 'Enter a valid date (DD/MM/YYYY).';
+    if (hour && (!/^\d{1,2}$/.test(hour) || Number(hour) > 23)) newErrors.hour = 'Hour must be between 0 and 23.';
+    if (!/^\d+$/.test(maxDepth) || !Number.isSafeInteger(Number(maxDepth)) || Number(maxDepth) <= 0) newErrors.maxDepth = 'Enter a positive depth in whole meters.';
+    if (!/^\d+$/.test(duration) || !Number.isSafeInteger(Number(duration)) || Number(duration) <= 0) newErrors.duration = 'Enter a positive duration in whole minutes.';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -93,7 +75,7 @@ export default function CreateDiveScreen({ navigation }: any) {
 
       navigation.navigate('MyDives');
     } catch {
-      setSubmitError('No se pudo crear la inmersión. Inténtalo de nuevo.');
+      setSubmitError('Could not create the dive. Please try again.');
     } finally {
       submitting.current = false;
       setSaving(false);
@@ -104,41 +86,41 @@ export default function CreateDiveScreen({ navigation }: any) {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
-        <Text style={styles.label}>País</Text>
+        <Text style={styles.label}>Country</Text>
         <View style={Platform.OS === 'web' ? undefined : styles.dropdown}>
-          <Picker accessibilityLabel="País" selectedValue={country} onValueChange={v => setCountry(String(v))} mode="dialog" prompt="Selecciona un país" style={Platform.OS === 'web' ? styles.input : styles.nativePicker}>
-            <Picker.Item label="Selecciona un país..." value="" />
-            {COUNTRIES.map(c => <Picker.Item key={c} label={c} value={c} />)}
+          <Picker accessibilityLabel="Country" selectedValue={country} onValueChange={v => setCountry(String(v))} mode="dialog" prompt="Select a country" style={Platform.OS === 'web' ? styles.input : styles.nativePicker}>
+            <Picker.Item label="Select a country..." value="" />
+            {sortedCountries.map(c => <Picker.Item key={c.value} label={c.label} value={c.value} />)}
           </Picker>
         </View>
         {error('country')}
-        <Text style={styles.label}>Lugar</Text>
-        <TextInput accessibilityLabel="Lugar" placeholder="Nombre del punto de buceo" value={location} onChangeText={setLocation} style={styles.input} />
+        <Text style={styles.label}>Location</Text>
+        <TextInput accessibilityLabel="Location" placeholder="Dive site name" value={location} onChangeText={setLocation} style={styles.input} />
         {error('location')}
-        <Text style={styles.label}>Fecha y hora local</Text>
+        <Text style={styles.label}>Local date and time</Text>
         <View style={styles.dateRow}>
           {[
-            { label: 'Día', placeholder: 'DD', value: day, set: setDay, length: 2 },
-            { label: 'Mes', placeholder: 'MM', value: month, set: setMonth, length: 2 },
-            { label: 'Año', placeholder: 'AAAA', value: year, set: setYear, length: 4 },
-            { label: 'Hora (opcional)', placeholder: 'HH', value: hour, set: setHour, length: 2 },
+            { label: 'Day', placeholder: 'DD', value: day, set: setDay, length: 2 },
+            { label: 'Month', placeholder: 'MM', value: month, set: setMonth, length: 2 },
+            { label: 'Year', placeholder: 'YYYY', value: year, set: setYear, length: 4 },
+            { label: 'Hour (optional)', placeholder: 'HH', value: hour, set: setHour, length: 2 },
           ].map(field => <View key={field.label} style={[styles.dateField, compact && styles.compactField]}>
             <Text style={styles.fieldLabel}>{field.label}</Text>
             <TextInput accessibilityLabel={field.label} placeholder={field.placeholder} value={field.value} onChangeText={field.set} keyboardType="number-pad" maxLength={field.length} style={styles.input} />
           </View>)}
         </View>
         {error('date')}{error('hour')}
-        <Text style={styles.label}>Profundidad máxima (m)</Text>
-        <TextInput accessibilityLabel="Profundidad máxima en metros" placeholder="30" value={maxDepth} onChangeText={setMaxDepth} style={styles.input} keyboardType="number-pad" />
+        <Text style={styles.label}>Maximum depth (m)</Text>
+        <TextInput accessibilityLabel="Maximum depth in meters" placeholder="30" value={maxDepth} onChangeText={setMaxDepth} style={styles.input} keyboardType="number-pad" />
         {error('maxDepth')}
-        <Text style={styles.label}>Duración (minutos)</Text>
-        <TextInput accessibilityLabel="Duración en minutos" placeholder="45" value={duration} onChangeText={setDuration} style={styles.input} keyboardType="number-pad" />
+        <Text style={styles.label}>Duration (minutes)</Text>
+        <TextInput accessibilityLabel="Duration in minutes" placeholder="45" value={duration} onChangeText={setDuration} style={styles.input} keyboardType="number-pad" />
         {error('duration')}
-        <Text style={styles.label}>Notas (opcional)</Text>
-        <TextInput accessibilityLabel="Notas" value={notes} onChangeText={setNotes} style={[styles.input, styles.notes]} multiline />
+        <Text style={styles.label}>Notes (optional)</Text>
+        <TextInput accessibilityLabel="Notes" value={notes} onChangeText={setNotes} style={[styles.input, styles.notes]} multiline />
         {submitError ? <Text accessibilityRole="alert" style={styles.errorText}>{submitError}</Text> : null}
         <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: saving, busy: saving }} disabled={saving} style={[styles.mainButton, saving && styles.disabled]} onPress={createDive}>
-          <Text style={styles.buttonText}>{saving ? 'Creando…' : 'Crear inmersión'}</Text>
+          <Text style={styles.buttonText}>{saving ? 'Creating…' : 'Log dive'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

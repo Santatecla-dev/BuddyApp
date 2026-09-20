@@ -16,14 +16,14 @@ export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login">
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="MyDives" component={MyDivesScreen} />
-        <Stack.Screen name="DiveDetail" component={DiveDetailScreen} />
-        <Stack.Screen name="CreateDive" component={CreateDiveScreen} />
-        <Stack.Screen name="Invitations" component={InvitationsScreen} />
-        <Stack.Screen name="InviteBuddy" component={InviteBuddyScreen} />
-        <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Perfil' }}/>
+        <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Sign in' }} />
+        <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Create account' }} />
+        <Stack.Screen name="MyDives" component={MyDivesScreen} options={{ title: 'My dives' }} />
+        <Stack.Screen name="DiveDetail" component={DiveDetailScreen} options={{ title: 'Dive details' }} />
+        <Stack.Screen name="CreateDive" component={CreateDiveScreen} options={{ title: 'Log a dive' }} />
+        <Stack.Screen name="Invitations" component={InvitationsScreen} options={{ title: 'Invitations' }} />
+        <Stack.Screen name="InviteBuddy" component={InviteBuddyScreen} options={{ title: 'Invite a buddy' }} />
+        <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }}/>
       </Stack.Navigator>
     </NavigationContainer>
   );
