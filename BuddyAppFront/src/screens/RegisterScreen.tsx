@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
+import { View, TextInput, TouchableOpacity, Text, StyleSheet, Alert, Platform } from 'react-native';
 import API from '../api/api';
 
 export default function RegisterScreen({ navigation }: any) {
@@ -38,13 +38,13 @@ export default function RegisterScreen({ navigation }: any) {
         placeholder="Nombre completo"
         value={name}
         onChangeText={setName}
-        style={styles.input}
+        style={[styles.input, Platform.OS === 'web' && styles.webInput]}
       />
       <TextInput
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
-        style={styles.input}
+        style={[styles.input, Platform.OS === 'web' && styles.webInput]}
         keyboardType="email-address"
         autoCapitalize="none"
       />
@@ -52,7 +52,7 @@ export default function RegisterScreen({ navigation }: any) {
         placeholder="Password"
         value={password}
         onChangeText={setPassword}
-        style={styles.input}
+        style={[styles.input, Platform.OS === 'web' && styles.webInput]}
         secureTextEntry
       />
 
@@ -73,6 +73,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 20 },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
   input: { borderWidth: 1, borderColor: '#ccc', padding: 12, borderRadius: 8, marginBottom: 10 },
+  webInput: { color: '#fff', caretColor: '#fff' } as any,
   button: { backgroundColor: '#00A8A8', padding: 15, borderRadius: 25, alignItems: 'center', marginTop: 10 },
   buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   error: { color: 'red', marginBottom: 10, textAlign: 'center' },

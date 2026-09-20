@@ -23,11 +23,11 @@ export default function LoginScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       {/* LOGO */}
-<Image
-  source={{ uri: '/images/buddy.png' }} // 🔹 URL relativa a public
-  style={styles.logo}
-  resizeMode="contain"
-/>
+      <Image
+        source={{ uri: '/images/buddy.png' }} // 🔹 URL relativa a public
+        style={[styles.logo, Platform.OS === 'web' && styles.webLogo]}
+        resizeMode="contain"
+      />
 
       <Text style={styles.label}>Email</Text>
       <TextInput
@@ -72,6 +72,12 @@ const styles = StyleSheet.create({
     height: 150,
     alignSelf: 'center',
     marginBottom: 30,
+  },
+
+  webLogo: {
+    width: 300,
+    height: 260,
+    marginBottom: 62,
   },
 
   label: {

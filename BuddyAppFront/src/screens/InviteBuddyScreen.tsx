@@ -77,6 +77,7 @@ export default function InviteBuddyScreen({ route }: any) {
       <TouchableOpacity
         style={[
           styles.button,
+          Platform.OS === 'web' && styles.webButton,
           buttonDisabled && { opacity: 0.6 },
           buttonSent && { backgroundColor: '#28A745' }, // verde al enviar
         ]}
@@ -134,6 +135,10 @@ const styles = StyleSheet.create({
         elevation: 5,
       },
     }),
+  },
+
+  webButton: {
+    marginTop: -18,
   },
 
   buttonText: {

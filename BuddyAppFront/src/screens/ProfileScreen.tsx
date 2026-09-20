@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Platform,
 } from 'react-native';
 import API from '../api/api';
 
@@ -103,20 +104,20 @@ if (!isOwnProfile) {
         {isOwnProfile ? 'Mi perfil' : 'Perfil del buddy'}
       </Text>
 
-      <View style={styles.card}>
+      <View style={[styles.card, Platform.OS === 'web' && styles.webCard]}>
         <View style={styles.topRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>Nombre completo</Text>
-            <Text style={styles.value}>{profile.name}</Text>
+            <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>{profile.name}</Text>
 
             <Text style={styles.label}>Email</Text>
-            <Text style={styles.value}>{profile.email}</Text>
+            <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>{profile.email}</Text>
 
             <Text style={styles.label}>Diver ID</Text>
-            <Text style={styles.value}>{profile.id}</Text>
+            <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>{profile.id}</Text>
 
             <Text style={styles.label}>Inmersiones totales</Text>
-            <Text style={styles.value}>
+            <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>
               {totalDives !== null ? totalDives : 'Cargando...'}
             </Text>
           </View>
@@ -138,7 +139,7 @@ if (!isOwnProfile) {
             placeholder="SSI, PADI, etc."
           />
         ) : (
-          <Text style={styles.value}>{profile.agency || 'No especificada'}</Text>
+          <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>{profile.agency || 'No especificada'}</Text>
         )}
 
         <Text style={styles.label}>Titulaciones</Text>
@@ -151,12 +152,12 @@ if (!isOwnProfile) {
           />
         ) : certifications.length > 0 ? (
           certifications.map((c, i) => (
-            <Text key={i} style={styles.value}>
+            <Text key={i} style={[styles.value, Platform.OS === 'web' && styles.webValue]}>
               • {c}
             </Text>
           ))
         ) : (
-          <Text style={styles.value}>No especificadas</Text>
+          <Text style={[styles.value, Platform.OS === 'web' && styles.webValue]}>No especificadas</Text>
         )}
       </View>
 
@@ -193,6 +194,11 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
 
+  webCard: {
+    overflow: 'hidden',
+    boxShadow: '0 12px 24px rgba(0, 0, 0, 0.34)',
+  } as any,
+
   topRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
 
   divesWithMe: {
@@ -210,6 +216,8 @@ const styles = StyleSheet.create({
 
   label: { fontWeight: 'bold', marginTop: 10, color: '#555' },
   value: { fontSize: 16, marginTop: 4 },
+
+  webValue: { color: '#fff' },
 
   input: {
     borderWidth: 1,

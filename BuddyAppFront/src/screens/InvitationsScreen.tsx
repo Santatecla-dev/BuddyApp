@@ -10,8 +10,15 @@ import {
 import API from '../api/api';
 import { DiveInvite } from '../types';
 
+type BuddyInviteGroup = {
+  key: string;
+  buddy: string;
+  invites: DiveInvite[];
+};
+
 export default function InvitationsScreen() {
   const [invites, setInvites] = useState<DiveInvite[]>([]);
+  const [groupedByBuddy, setGroupedByBuddy] = useState(false);
 
   const fetchInvites = async () => {
     try {
@@ -37,8 +44,22 @@ export default function InvitationsScreen() {
     fetchInvites();
   }, []);
 
-  const renderItem = ({ item }: { item: DiveInvite }) => (
-    <View style={styles.card}>
+  const groupedInvites = (): BuddyInviteGroup[] => {
+    const groups: Record<string, BuddyInviteGroup> = {};
+
+    invites.forEach((invite) => {
+      const buddy = invite.invitedByUser?.name || 'Buddy sin nombre';
+      if (!groups[buddy]) {
+        groups[buddy] = { key: buddy, buddy, invites: [] };
+      }
+      groups[buddy].invites.push(invite);
+    });
+
+    return Object.values(groups);
+  };
+
+  const renderInviteCard = (item: DiveInvite, grouped = false) => (
+    <View style={[styles.card, Platform.OS === 'web' && styles.webCard]}>
       <Text style={styles.title}>
         {item.dive.location} ·{' '}
         {new Date(item.dive.date).toLocaleDateString()}
@@ -50,14 +71,14 @@ export default function InvitationsScreen() {
 
       <View style={styles.actions}>
         <TouchableOpacity
-          style={[styles.button, styles.acceptButton]}
+          style={[styles.button, styles.acceptButton, Platform.OS === 'web' && styles.webAcceptButton]}
           onPress={() => respond(item.id, true)}
         >
           <Text style={styles.buttonText}>Aceptar</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.button, styles.rejectButton]}
+          style={[styles.button, styles.rejectButton, Platform.OS === 'web' && styles.webRejectButton]}
           onPress={() => respond(item.id, false)}
         >
           <Text style={styles.buttonText}>Rechazar</Text>
@@ -66,12 +87,49 @@ export default function InvitationsScreen() {
     </View>
   );
 
+  const renderItem = ({ item }: { item: DiveInvite | BuddyInviteGroup }) => {
+    if (!groupedByBuddy) {
+      return renderInviteCard(item as DiveInvite);
+    }
+
+    const group = item as BuddyInviteGroup;
+    return (
+      <View style={[styles.groupSection, Platform.OS === 'web' && styles.webGroupSection]}>
+        <View style={[styles.groupHeader, Platform.OS === 'web' && styles.webGroupHeader]}>
+          <Text style={styles.groupHeaderLabel}>Buddy</Text>
+          <Text style={styles.groupHeaderName} numberOfLines={1}>{group.buddy}</Text>
+          <Text style={styles.groupHeaderCount}>{group.invites.length} invitación{group.invites.length === 1 ? '' : 'es'}</Text>
+        </View>
+        {group.invites.map((invite) => (
+          <View key={invite.id} style={styles.groupedInvite}>
+            {renderInviteCard(invite, true)}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const listData: Array<DiveInvite | BuddyInviteGroup> = groupedByBuddy
+    ? groupedInvites()
+    : invites;
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={invites}
-        keyExtractor={(item) => item.id.toString()}
+        data={listData}
+        keyExtractor={(item) => groupedByBuddy ? (item as BuddyInviteGroup).key : (item as DiveInvite).id.toString()}
         renderItem={renderItem}
+        scrollEnabled={Platform.OS !== 'web'}
+        ListHeaderComponent={
+          <TouchableOpacity
+            style={styles.groupToggle}
+            onPress={() => setGroupedByBuddy((value) => !value)}
+          >
+            <Text style={styles.groupToggleText}>
+              {groupedByBuddy ? 'Mostrar todas' : 'Agrupar por buddy'}
+            </Text>
+          </TouchableOpacity>
+        }
         ListEmptyComponent={
           <Text style={styles.emptyText}>
             No tienes invitaciones pendientes 🤿
@@ -106,6 +164,13 @@ const styles = StyleSheet.create({
     }),
   },
 
+  webCard: {
+    width: 'calc(100% + 96px)',
+    marginLeft: -48,
+    overflow: 'hidden',
+    boxShadow: '0 10px 22px rgba(0, 0, 0, 0.32)',
+  } as any,
+
   title: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -139,6 +204,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#E74C3C',
   },
 
+  webAcceptButton: { backgroundColor: '#E74C3C' },
+  webRejectButton: { backgroundColor: '#2ECC71' },
+
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
@@ -149,5 +217,67 @@ const styles = StyleSheet.create({
     marginTop: 40,
     color: '#777',
     fontSize: 16,
+  },
+
+  groupToggle: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#0077CC',
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    marginBottom: 16,
+  },
+
+  groupToggleText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+
+  groupSection: {
+    marginBottom: 18,
+  },
+
+  webGroupSection: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'stretch',
+    marginHorizontal: -12,
+  } as any,
+
+  groupHeader: {
+    backgroundColor: '#f2f8ff',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+
+  webGroupHeader: {
+    width: 150,
+    marginRight: 8,
+    marginBottom: 0,
+  },
+
+  groupHeaderLabel: {
+    color: '#00A8A8',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+
+  groupHeaderName: {
+    color: '#0077CC',
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+
+  groupHeaderCount: {
+    color: '#555',
+    fontSize: 12,
+    marginTop: 5,
+  },
+
+  groupedInvite: {
+    flex: 1,
+    minWidth: 280,
   },
 });
