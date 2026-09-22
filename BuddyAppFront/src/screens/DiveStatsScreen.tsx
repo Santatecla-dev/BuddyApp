@@ -27,10 +27,13 @@ export default function DiveStatsScreen() {
 
   const visibleDives = useMemo(() => {
     if (range === 'all') return dives;
-    const since = new Date();
-    if (range === 'year') since.setFullYear(since.getFullYear() - 1);
-    if (range === 'month') since.setMonth(since.getMonth() - 1);
-    return dives.filter((dive) => new Date(dive.date) >= since);
+    if (range === 'year') {
+      const since = new Date();
+      since.setFullYear(since.getFullYear() - 1);
+      return dives.filter((dive) => new Date(dive.date) >= since);
+    }
+    const previousMonth = (new Date().getMonth() + 11) % 12;
+    return dives.filter((dive) => new Date(dive.date).getMonth() === previousMonth);
   }, [dives, range]);
 
   const averageDepth = visibleDives.length
