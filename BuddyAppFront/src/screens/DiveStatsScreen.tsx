@@ -1,134 +1,130 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import API from '../api/api';
 import { Dive } from '../types';
-
-type Range = 'all' | 'year' | 'month';
+import { diveDate, filterDives, formatDiveTime, StatsRange, summarizeDives } from '../utils/diveStats';
 
 export default function DiveStatsScreen() {
   const [dives, setDives] = useState<Dive[]>([]);
-  const [range, setRange] = useState<Range>('all');
+  const [range, setRange] = useState<StatsRange>('all');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [now, setNow] = useState(() => new Date());
 
-  useEffect(() => {
-    API.get('/dives/my')
-      .then((response) => setDives(response.data))
-      .catch(() => setDives([]))
-      .finally(() => setLoading(false));
-  }, []);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    const controller = new AbortController();
+    setNow(new Date());
+    setLoading(true);
+    setError(false);
+    API.get<Dive[]>('/dives/my', { signal: controller.signal })
+      .then(response => { if (active) setDives(response.data); })
+      .catch(() => { if (active) setError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; controller.abort(); };
+  }, [attempt]));
 
-  const visibleDives = useMemo(() => {
-    if (range === 'all') return dives;
-    if (range === 'year') {
-      const since = new Date();
-      since.setFullYear(since.getFullYear() - 1);
-      return dives.filter((dive) => new Date(dive.date) >= since);
-    }
-    const previousMonth = (new Date().getMonth() + 11) % 12;
-    return dives.filter((dive) => new Date(dive.date).getMonth() === previousMonth);
-  }, [dives, range]);
+  const visibleDives = useMemo(() => filterDives(dives, range, now), [dives, range, now]);
+  const { averageDepth, totalMinutes, countries, recent, maxDuration, deepestDive, longestDive } =
+    useMemo(() => summarizeDives(visibleDives), [visibleDives]);
+  const period = range === 'all' ? 'All time' : range === 'year' ? String(now.getFullYear() - 1)
+    : new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
-  const averageDepth = visibleDives.length
-    ? Math.round(visibleDives.reduce((sum, dive) => sum + dive.maxDepth, 0) / visibleDives.length)
-    : 0;
-  const totalMinutes = visibleDives.reduce((sum, dive) => sum + dive.duration, 0);
-  const countries = useMemo(() => {
-    const values: Record<string, number> = {};
-    visibleDives.forEach((dive) => { values[dive.country] = (values[dive.country] || 0) + 1; });
-    return Object.entries(values).sort((a, b) => b[1] - a[1]);
-  }, [visibleDives]);
+  if (loading) return (
+    <View style={styles.loading} accessibilityLiveRegion="polite">
+      <ActivityIndicator color="#0077CC" accessibilityLabel="Loading statistics" />
+      <Text style={styles.loadingText}>Loading statistics…</Text>
+    </View>
+  );
 
-  const recent = [...visibleDives]
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(-6);
-  const maxDuration = Math.max(...recent.map((dive) => dive.duration), 1);
-  const deepestDive = visibleDives.length ? [...visibleDives].sort((a, b) => b.maxDepth - a.maxDepth)[0] : null;
-  const longestDive = visibleDives.length ? [...visibleDives].sort((a, b) => b.duration - a.duration)[0] : null;
-  const topCountry = countries[0]?.[0] || 'No country yet';
-
-  if (loading) {
-    return <View style={styles.loading}><ActivityIndicator color="#0077CC" /><Text style={styles.loadingText}>Loading statistics…</Text></View>;
-  }
+  if (error) return (
+    <View style={styles.loading}>
+      <Text accessibilityRole="alert" style={styles.emptyText}>Could not load your statistics. Please try again.</Text>
+      <TouchableOpacity accessibilityRole="button" style={[styles.rangeButton, styles.rangeButtonActive]} onPress={() => setAttempt(value => value + 1)}>
+        <Text style={styles.rangeTextActive}>Retry</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headingRow}>
         <View style={styles.headingCopy}>
-          <Text style={styles.title}>Dive statistics</Text>
+          <Text accessibilityRole="header" style={styles.title}>Dive statistics</Text>
           <Text style={styles.subtitle}>A summary of your logbook</Text>
         </View>
-        <Text style={styles.periodText}>{range === 'all' ? 'All time' : range === 'year' ? 'Last year' : 'Last month'}</Text>
+        <Text style={styles.periodText} accessibilityLiveRegion="polite">{period}</Text>
       </View>
 
-      <View style={[styles.rangeRow, Platform.OS === 'web' && styles.webRangeRow]}>
-        {([['all', 'All time'], ['year', 'Last year'], ['month', 'Last month']] as [Range, string][]).map(([value, label]) => (
-          <TouchableOpacity key={value} style={[styles.rangeButton, range === value && styles.rangeButtonActive]} onPress={() => setRange(value)}>
+      <View style={styles.rangeRow}>
+        {([['all', 'All time'], ['year', 'Last year'], ['month', 'Last month']] as [StatsRange, string][]).map(([value, label]) => (
+          <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: range === value }}
+            accessibilityHint={value === 'all' ? 'Show all logged dives' : 'Show dives from the previous calendar ' + value}
+            style={[styles.rangeButton, range === value && styles.rangeButtonActive]} onPress={() => { setNow(new Date()); setRange(value); }}>
             <Text style={[styles.rangeText, range === value && styles.rangeTextActive]}>{label}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <View style={[styles.summaryGrid, Platform.OS === 'web' && styles.webSummaryGrid]}>
+      <View style={styles.summaryGrid}>
         <View style={styles.summaryCard}><Text style={styles.summaryLabel}>Dives</Text><Text style={styles.summaryValue}>{visibleDives.length}</Text></View>
         <View style={styles.summaryCard}><Text style={styles.summaryLabel}>Average depth</Text><Text style={styles.summaryValue}>{averageDepth} m</Text></View>
-        <View style={styles.summaryCard}><Text style={styles.summaryLabel}>Time underwater</Text><Text style={styles.summaryValue}>{Math.round(totalMinutes / 60)} h</Text></View>
+        <View style={styles.summaryCard}><Text style={styles.summaryLabel}>Time underwater</Text><Text style={styles.summaryValue}>{formatDiveTime(totalMinutes)}</Text></View>
       </View>
 
       <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Dive duration</Text>
-        {recent.length ? (
-          <View style={[styles.chart, Platform.OS === 'web' && styles.webChart]}>
-            <View style={styles.chartBaseline} />
-            {recent.map((dive) => (
-              <View key={dive.id} style={styles.barColumn}>
-                <View style={styles.barTrack}>
-                  <View style={[styles.bar, { height: `${Math.max(12, (dive.duration / maxDuration) * 100)}%` }]} />
+        <Text accessibilityRole="header" style={styles.panelTitle}>Dive duration</Text>
+        {recent.length ? <>
+          <Text style={styles.chartDescription}>Latest {recent.length} {recent.length === 1 ? 'dive' : 'dives'} in this period · oldest to newest · minutes</Text>
+          <View style={styles.chart}>
+            {recent.map(dive => {
+              const date = diveDate(dive.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+              return (
+                <View key={dive.id} style={styles.barColumn} accessible accessibilityLabel={date + ', ' + dive.location + ', ' + dive.duration + ' minutes'}>
+                  <Text style={styles.barValue}>{dive.duration} min</Text>
+                  <View style={styles.barTrack} accessible={false}>
+                    <View style={[styles.bar, { height: `${(dive.duration / maxDuration) * 100}%` }]} />
+                  </View>
+                  <Text style={styles.barLabel}>{date}</Text>
                 </View>
-                <Text style={styles.barLabel} numberOfLines={1}>{new Date(dive.date).toLocaleDateString()}</Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
-        ) : <Text style={styles.emptyText}>No dives in this period.</Text>}
+        </> : <Text style={styles.emptyText}>No dives in this period.</Text>}
       </View>
 
-      <View style={[styles.panel, Platform.OS === 'web' && styles.webHighlightPanel]}>
-        <Text style={styles.panelTitle}>Highlights</Text>
-        <View style={[styles.highlightViewport, Platform.OS === 'web' && styles.webHighlightViewport]}>
-          <View style={[styles.highlightRow, Platform.OS === 'web' && styles.webHighlightRow]}>
-            <View style={[styles.highlightCard, Platform.OS === 'web' && styles.webHighlightCardFirst]}>
-              <Text style={styles.highlightKicker}>DEEPEST DIVE</Text>
-              <Text style={styles.highlightValue}>{deepestDive ? `${deepestDive.maxDepth} m` : '—'}</Text>
-              <Text style={styles.highlightText} numberOfLines={1}>{deepestDive?.location || 'No dives yet'}</Text>
-            </View>
-            <View style={[styles.highlightCard, Platform.OS === 'web' && styles.webHighlightCardOverlap]}>
-              <Text style={styles.highlightKicker}>LONGEST DIVE</Text>
-              <Text style={styles.highlightValue}>{longestDive ? `${longestDive.duration} min` : '—'}</Text>
-              <Text style={styles.highlightText} numberOfLines={1}>{longestDive?.location || 'No dives yet'}</Text>
-            </View>
-            <View style={[styles.highlightCard, Platform.OS === 'web' && styles.webHighlightCardLast]}>
-              <Text style={styles.highlightKicker}>TOP COUNTRY</Text>
-              <Text style={styles.highlightValue}>{countries.length ? countries[0][1] : '—'}</Text>
-              <Text style={styles.highlightText} numberOfLines={1}>{topCountry}</Text>
-            </View>
+      <View style={styles.panel}>
+        <Text accessibilityRole="header" style={styles.panelTitle}>Highlights</Text>
+        <View style={styles.highlightRow}>
+          <View style={styles.highlightCard}>
+            <Text style={styles.highlightKicker}>DEEPEST DIVE</Text>
+            <Text style={styles.highlightValue}>{deepestDive ? deepestDive.maxDepth + ' m' : '—'}</Text>
+            <Text style={styles.highlightText}>{deepestDive?.location || 'No dives in this period'}</Text>
+          </View>
+          <View style={styles.highlightCard}>
+            <Text style={styles.highlightKicker}>LONGEST DIVE</Text>
+            <Text style={styles.highlightValue}>{longestDive ? longestDive.duration + ' min' : '—'}</Text>
+            <Text style={styles.highlightText}>{longestDive?.location || 'No dives in this period'}</Text>
+          </View>
+          <View style={styles.highlightCard}>
+            <Text style={styles.highlightKicker}>TOP COUNTRY</Text>
+            <Text style={styles.highlightValue}>{countries.length ? countries[0][1] + (countries[0][1] === 1 ? ' dive' : ' dives') : '—'}</Text>
+            <Text style={styles.highlightText}>{countries[0]?.[0] || 'No country in this period'}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Countries visited</Text>
+        <Text accessibilityRole="header" style={styles.panelTitle}>Countries visited</Text>
         {countries.length ? countries.map(([country, count]) => (
-          <View key={country} style={[styles.countryRow, Platform.OS === 'web' && styles.webCountryRow]}>
-            <Text style={styles.countryName} numberOfLines={1}>{country}</Text>
-            <View style={styles.countryTrack}><View style={[styles.countryBar, { width: `${(count / countries[0][1]) * 100}%` }]} /></View>
-            <Text style={styles.countryCount}>{count}</Text>
+          <View key={country} style={styles.countryRow} accessible accessibilityLabel={country + ': ' + count + (count === 1 ? ' dive' : ' dives')}>
+            <View style={styles.countryHeading}>
+              <Text style={styles.countryName}>{country}</Text>
+              <Text style={styles.countryCount}>{count}</Text>
+            </View>
+            <View style={styles.countryTrack} accessible={false}><View style={[styles.countryBar, { width: `${(count / countries[0][1]) * 100}%` }]} /></View>
           </View>
         )) : <Text style={styles.emptyText}>No countries to display.</Text>}
       </View>
@@ -139,50 +135,41 @@ export default function DiveStatsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f7f9fc' },
   content: { width: '100%', maxWidth: 1050, alignSelf: 'center', padding: 20, paddingBottom: 50 },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f7f9fc' },
+  loading: { flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f7f9fc' },
   loadingText: { color: '#555', marginTop: 12 },
-  headingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 18 },
-  headingCopy: { flex: 1 },
+  headingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 18 },
+  headingCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 240 },
   title: { fontSize: 28, fontWeight: 'bold', color: '#0077CC' },
   subtitle: { fontSize: 15, color: '#555', marginTop: 4 },
-  periodText: { color: '#00A8A8', fontWeight: 'bold', marginBottom: 4 },
-  rangeRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
-  webRangeRow: { width: 600, flexWrap: 'nowrap' },
-  rangeButton: { backgroundColor: 'white', borderColor: '#b8d8ee', borderWidth: 1, borderRadius: 22, paddingHorizontal: 15, paddingVertical: 10 },
+  periodText: { color: '#0077CC', fontWeight: 'bold', marginBottom: 4, flexShrink: 1 },
+  rangeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
+  rangeButton: { minHeight: 44, justifyContent: 'center', backgroundColor: 'white', borderColor: '#b8d8ee', borderWidth: 1, borderRadius: 22, paddingHorizontal: 15, paddingVertical: 10 },
   rangeButtonActive: { backgroundColor: '#0077CC', borderColor: '#0077CC' },
   rangeText: { color: '#0077CC', fontWeight: 'bold' },
-  rangeTextActive: { color: 'white' },
+  rangeTextActive: { color: 'white', fontWeight: 'bold' },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 18 },
-  webSummaryGrid: { flexWrap: 'nowrap', width: 780 },
-  summaryCard: { flex: 1, minWidth: 180, backgroundColor: 'white', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#e2e8f0' },
+  summaryCard: { flexGrow: 1, flexShrink: 1, flexBasis: 220, minWidth: 0, backgroundColor: 'white', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#e2e8f0' },
   summaryLabel: { color: '#555', fontSize: 13 },
   summaryValue: { color: '#0077CC', fontSize: 26, fontWeight: 'bold', marginTop: 7 },
   panel: { backgroundColor: 'white', borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', padding: 20, marginBottom: 18 },
-  webHighlightPanel: { marginTop: -8, overflow: 'hidden', boxShadow: '0 12px 24px rgba(0, 0, 0, 0.28)' } as any,
   panelTitle: { color: '#1a202c', fontSize: 18, fontWeight: 'bold', marginBottom: 18 },
-  chart: { height: 210, flexDirection: 'row', alignItems: 'stretch', gap: 12, position: 'relative' },
-  webChart: { height: 170, overflow: 'hidden' },
-  chartBaseline: { position: 'absolute', left: 0, right: 0, bottom: 30, height: 1, backgroundColor: '#cbd5e0' },
-  barColumn: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', minWidth: 42 },
-  barTrack: { height: 160, width: '72%', justifyContent: 'flex-end', backgroundColor: '#f2f8ff', borderRadius: 8, overflow: 'hidden' },
+  chartDescription: { color: '#555', fontSize: 13, marginBottom: 16 },
+  chart: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  barColumn: { flexGrow: 1, flexShrink: 1, flexBasis: 90, minWidth: 0, alignItems: 'center' },
+  barValue: { color: '#334155', fontSize: 13, textAlign: 'center', marginBottom: 8 },
+  barTrack: { height: 160, width: '72%', maxWidth: 100, justifyContent: 'flex-end', backgroundColor: '#f2f8ff', borderRadius: 8, overflow: 'hidden' },
   bar: { width: '100%', backgroundColor: '#00A8A8', borderRadius: 8 },
-  barLabel: { fontSize: 10, color: '#666', marginTop: 8, width: 72, textAlign: 'center' },
-  countryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 13 },
-  webCountryRow: { minWidth: 760, width: 760 },
-  countryName: { width: 130, color: '#334155', fontSize: 14 },
-  countryTrack: { flex: 1, height: 10, borderRadius: 8, backgroundColor: '#e7f2f8', overflow: 'hidden' },
+  barLabel: { fontSize: 12, color: '#555', marginTop: 8, textAlign: 'center', width: '100%' },
+  countryRow: { marginBottom: 16 },
+  countryHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 8 },
+  countryName: { flex: 1, minWidth: 0, color: '#334155', fontSize: 14 },
+  countryTrack: { width: '100%', height: 10, borderRadius: 8, backgroundColor: '#e7f2f8', overflow: 'hidden' },
   countryBar: { height: '100%', borderRadius: 8, backgroundColor: '#0077CC' },
-  countryCount: { width: 24, textAlign: 'right', color: '#0077CC', fontWeight: 'bold' },
-  emptyText: { color: '#777', textAlign: 'center', paddingVertical: 20 },
-  highlightViewport: { width: '100%' },
-  webHighlightViewport: { height: 148, overflow: 'hidden' },
-  highlightRow: { flexDirection: 'row', gap: 14 },
-  webHighlightRow: { width: 860, flexWrap: 'nowrap' },
-  webHighlightCardFirst: { zIndex: 3, transform: [{ translateX: 18 }, { translateY: 4 }] },
-  webHighlightCardOverlap: { marginLeft: -76, zIndex: 2, transform: [{ translateY: 22 }] },
-  webHighlightCardLast: { marginLeft: -76, zIndex: 1, transform: [{ translateY: 40 }] },
-  highlightCard: { flex: 1, minWidth: 220, minHeight: 132, borderRadius: 16, backgroundColor: '#f2f8ff', padding: 16, borderWidth: 1, borderColor: '#c9e4f4', boxShadow: '0 10px 20px rgba(0, 119, 204, 0.22)' } as any,
-  highlightKicker: { color: '#00A8A8', fontSize: 11, fontWeight: 'bold', letterSpacing: 0.7 },
+  countryCount: { color: '#0077CC', fontWeight: 'bold' },
+  emptyText: { color: '#555', textAlign: 'center', paddingVertical: 20 },
+  highlightRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  highlightCard: { flexGrow: 1, flexShrink: 1, flexBasis: 220, minWidth: 0, borderRadius: 16, backgroundColor: '#f2f8ff', padding: 16, borderWidth: 1, borderColor: '#c9e4f4' },
+  highlightKicker: { color: '#0077CC', fontSize: 11, fontWeight: 'bold', letterSpacing: 0.7 },
   highlightValue: { color: '#0077CC', fontSize: 25, fontWeight: 'bold', marginTop: 12 },
   highlightText: { color: '#445', fontSize: 14, marginTop: 7 },
 });
