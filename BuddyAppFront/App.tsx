@@ -9,6 +9,7 @@ import InvitationsScreen from './src/screens/InvitationsScreen';
 import InviteBuddyScreen from './src/screens/InviteBuddyScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import DiveStatsScreen from './src/screens/DiveStatsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -30,6 +31,7 @@ export default function App() {
         <Stack.Screen name="Invitations" component={InvitationsScreen} options={{ title: 'Invitations' }} />
         <Stack.Screen name="InviteBuddy" component={InviteBuddyScreen} options={{ title: 'Invite Buddy' }} />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+        <Stack.Screen name="DiveStats" component={DiveStatsScreen} options={{ title: 'Dive statistics' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

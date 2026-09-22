@@ -308,6 +308,14 @@ export default function MyDivesScreen({ navigation, route }: any) {
         </Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        accessibilityRole="button"
+        style={styles.statsButton}
+        onPress={() => navigation.navigate('DiveStats')}
+      >
+        <Text style={styles.statsButtonText}>View dive statistics</Text>
+      </TouchableOpacity>
+
 
         {loadError ? <View><Text accessibilityRole="alert" style={styles.statusText}>{loadError}</Text><TouchableOpacity accessibilityRole="button" style={styles.groupButton} onPress={fetchDives}><Text style={styles.groupButtonText}>Retry</Text></TouchableOpacity></View> : null}
       </>}
@@ -456,6 +464,21 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+
+  statsButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#00A8A8',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+
+  statsButtonText: {
+    color: '#00A8A8',
+    fontWeight: 'bold',
   },
 
   title: {
