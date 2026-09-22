@@ -11,48 +11,73 @@ import API from '../api/api';
 import { Dive } from '../types';
 import CountryFlag from 'react-native-country-flag';
 
-// Mapa de país -> código ISO
+// Country name -> ISO code map (supports both English and Spanish names)
 export const CountryISO: { [nombre: string]: string } = {
-  "Afganistán": "AF", "Albania": "AL", "Argelia": "DZ", "Andorra": "AD", "Angola": "AO",
-  "Antigua y Barbuda": "AG", "Argentina": "AR", "Armenia": "AM", "Australia": "AU", "Austria": "AT",
-  "Azerbaiyán": "AZ", "Bahamas": "BS", "Baréin": "BH", "Bangladés": "BD", "Barbados": "BB",
+  "Afghanistan": "AF", "Albania": "AL", "Algeria": "DZ", "Andorra": "AD", "Angola": "AO",
+  "Antigua and Barbuda": "AG", "Argentina": "AR", "Armenia": "AM", "Australia": "AU", "Austria": "AT",
+  "Azerbaijan": "AZ", "Bahamas": "BS", "Bahrain": "BH", "Bangladesh": "BD", "Barbados": "BB",
+  "Belarus": "BY", "Belgium": "BE", "Belize": "BZ", "Benin": "BJ", "Bhutan": "BT",
+  "Bolivia": "BO", "Bosnia and Herzegovina": "BA", "Botswana": "BW", "Brazil": "BR", "Brunei": "BN",
+  "Bulgaria": "BG", "Burkina Faso": "BF", "Burundi": "BI", "Cabo Verde": "CV", "Cambodia": "KH",
+  "Cameroon": "CM", "Canada": "CA", "Central African Republic": "CF", "Chad": "TD", "Chile": "CL",
+  "China": "CN", "Colombia": "CO", "Comoros": "KM", "Congo": "CG", "Costa Rica": "CR",
+  "Croatia": "HR", "Cuba": "CU", "Cyprus": "CY", "Czech Republic": "CZ",
+  "Denmark": "DK", "Djibouti": "DJ", "Dominica": "DM", "Dominican Republic": "DO", "Ecuador": "EC",
+  "Egypt": "EG", "El Salvador": "SV", "Equatorial Guinea": "GQ", "Eritrea": "ER", "Estonia": "EE",
+  "Eswatini": "SZ", "Ethiopia": "ET", "Fiji": "FJ", "Finland": "FI", "France": "FR",
+  "Gabon": "GA", "Gambia": "GM", "Georgia": "GE", "Germany": "DE", "Ghana": "GH",
+  "Greece": "GR", "Grenada": "GD", "Guatemala": "GT", "Guinea": "GN", "Guinea-Bissau": "GW",
+  "Guyana": "GY", "Haiti": "HT", "Honduras": "HN", "Hungary": "HU", "Iceland": "IS",
+  "India": "IN", "Indonesia": "ID", "Iran": "IR", "Iraq": "IQ", "Ireland": "IE",
+  "Israel": "IL", "Italy": "IT", "Jamaica": "JM", "Japan": "JP", "Jordan": "JO",
+  "Kazakhstan": "KZ", "Kenya": "KE", "Kiribati": "KI", "Kuwait": "KW", "Kyrgyzstan": "KG",
+  "Laos": "LA", "Latvia": "LV", "Lebanon": "LB", "Lesotho": "LS", "Liberia": "LR",
+  "Libya": "LY", "Liechtenstein": "LI", "Lithuania": "LT", "Luxembourg": "LU", "Madagascar": "MG",
+  "Malawi": "MW", "Malaysia": "MY", "Maldives": "MV", "Mali": "ML", "Malta": "MT",
+  "Marshall Islands": "MH", "Mauritania": "MR", "Mauritius": "MU", "Mexico": "MX",
+  "Micronesia": "FM", "Moldova": "MD", "Monaco": "MC", "Mongolia": "MN",
+  "Montenegro": "ME", "Morocco": "MA", "Mozambique": "MZ", "Myanmar": "MM", "Namibia": "NA",
+  "Nauru": "NR", "Nepal": "NP", "Netherlands": "NL", "New Zealand": "NZ", "Nicaragua": "NI",
+  "Niger": "NE", "Nigeria": "NG", "North Korea": "KP", "North Macedonia": "MK", "Norway": "NO",
+  "Oman": "OM", "Pakistan": "PK", "Palau": "PW", "Panama": "PA", "Papua New Guinea": "PG",
+  "Paraguay": "PY", "Peru": "PE", "Philippines": "PH", "Poland": "PL", "Portugal": "PT",
+  "Qatar": "QA", "Romania": "RO", "Russia": "RU", "Rwanda": "RW",
+  "Saint Kitts and Nevis": "KN", "Saint Lucia": "LC", "Saint Vincent and the Grenadines": "VC",
+  "Samoa": "WS", "San Marino": "SM", "Sao Tome and Principe": "ST", "Saudi Arabia": "SA",
+  "Senegal": "SN", "Serbia": "RS", "Seychelles": "SC", "Sierra Leone": "SL", "Singapore": "SG",
+  "Slovakia": "SK", "Slovenia": "SI", "Solomon Islands": "SB", "Somalia": "SO", "South Africa": "ZA",
+  "South Sudan": "SS", "Spain": "ES", "Sri Lanka": "LK", "Sudan": "SD", "Suriname": "SR",
+  "Sweden": "SE", "Switzerland": "CH", "Syria": "SY", "Tajikistan": "TJ", "Thailand": "TH",
+  "Timor-Leste": "TL", "Togo": "TG", "Tonga": "TO", "Trinidad and Tobago": "TT", "Tunisia": "TN",
+  "Turkey": "TR", "Turkmenistan": "TM", "Tuvalu": "TV", "Uganda": "UG", "Ukraine": "UA",
+  "United Arab Emirates": "AE", "United Kingdom": "GB", "Tanzania": "TZ",
+  "United States": "US", "Uruguay": "UY", "Uzbekistan": "UZ", "Vanuatu": "VU",
+  "Venezuela": "VE", "Vietnam": "VN", "Yemen": "YE", "Zambia": "ZM", "Zimbabwe": "ZW", "Taiwan": "TW",
+
+  // Spanish names backwards compatibility
+  "Afganistán": "AF", "Argelia": "DZ", "Azerbaiyán": "AZ", "Baréin": "BH", "Bangladés": "BD",
   "Bielorrusia": "BY", "Bélgica": "BE", "Belice": "BZ", "Benín": "BJ", "Bután": "BT",
-  "Bolivia": "BO", "Bosnia y Herzegovina": "BA", "Botsuana": "BW", "Brasil": "BR", "Brunéi": "BN",
-  "Bulgaria": "BG", "Burkina Faso": "BF", "Burundi": "BI", "Cabo Verde": "CV", "Camboya": "KH",
-  "Camerún": "CM", "Canadá": "CA", "República Centroafricana": "CF", "Chad": "TD", "Chile": "CL",
-  "China": "CN", "Colombia": "CO", "Comoras": "KM", "Congo": "CG", "Costa de Marfil": "CI",
-  "Costa Rica": "CR", "Croacia": "HR", "Cuba": "CU", "Chipre": "CY", "República Checa": "CZ",
-  "Dinamarca": "DK", "Yibuti": "DJ", "Dominica": "DM", "República Dominicana": "DO", "Ecuador": "EC",
-  "Egipto": "EG", "El Salvador": "SV", "Guinea Ecuatorial": "GQ", "Eritrea": "ER", "Estonia": "EE",
-  "Esuatini": "SZ", "Etiopía": "ET", "Fiyi": "FJ", "Finlandia": "FI", "Francia": "FR",
-  "Gabón": "GA", "Gambia": "GM", "Georgia": "GE", "Alemania": "DE", "Ghana": "GH",
-  "Grecia": "GR", "Granada": "GD", "Guatemala": "GT", "Guinea": "GN", "Guinea-Bisáu": "GW",
-  "Guyana": "GY", "Haití": "HT", "Honduras": "HN", "Hungría": "HU", "Islandia": "IS",
-  "India": "IN", "Indonesia": "ID", "Irán": "IR", "Irak": "IQ", "Irlanda": "IE",
-  "Israel": "IL", "Italia": "IT", "Jamaica": "JM", "Japón": "JP", "Jordania": "JO",
-  "Kazajistán": "KZ", "Kenia": "KE", "Kiribati": "KI", "Kuwait": "KW", "Kirguistán": "KG",
-  "Laos": "LA", "Letonia": "LV", "Líbano": "LB", "Lesoto": "LS", "Liberia": "LR",
-  "Libia": "LY", "Liechtenstein": "LI", "Lituania": "LT", "Luxemburgo": "LU", "Madagascar": "MG",
-  "Malaui": "MW", "Malasia": "MY", "Maldivas": "MV", "Malí": "ML", "Malta": "MT",
-  "Islas Marshall": "MH", "Mauritania": "MR", "Mauricio": "MU", "México": "MX",
-  "Estados Federados de Micronesia": "FM", "Moldavia": "MD", "Mónaco": "MC", "Mongolia": "MN",
-  "Montenegro": "ME", "Marruecos": "MA", "Mozambique": "MZ", "Birmania": "MM", "Namibia": "NA",
-  "Nauru": "NR", "Nepal": "NP", "Países Bajos": "NL", "Nueva Zelanda": "NZ", "Nicaragua": "NI",
-  "Níger": "NE", "Nigeria": "NG", "Corea del Norte": "KP", "Macedonia del Norte": "MK", "Noruega": "NO",
-  "Omán": "OM", "Pakistán": "PK", "Palaos": "PW", "Panamá": "PA", "Papúa Nueva Guinea": "PG",
-  "Paraguay": "PY", "Perú": "PE", "Filipinas": "PH", "Polonia": "PL", "Portugal": "PT",
-  "Catar": "QA", "Rumanía": "RO", "Federación Rusa": "RU", "Ruanda": "RW",
-  "San Cristóbal y Nieves": "KN", "Santa Lucía": "LC", "San Vicente y las Granadinas": "VC",
-  "Samoa": "WS", "San Marino": "SM", "Santo Tomé y Príncipe": "ST", "Arabia Saudita": "SA",
-  "Senegal": "SN", "Serbia": "RS", "Seychelles": "SC", "Sierra Leona": "SL", "Singapur": "SG",
-  "Eslovaquia": "SK", "Eslovenia": "SI", "Islas Salomón": "SB", "Somalia": "SO", "Sudáfrica": "ZA",
-  "Sudán del Sur": "SS", "España": "ES", "Sri Lanka": "LK", "Sudán": "SD", "Surinam": "SR",
+  "Botsuana": "BW", "Brasil": "BR", "Brunéi": "BN", "Camboya": "KH",
+  "Camerún": "CM", "Canadá": "CA", "República Centroafricana": "CF", "Chipre": "CY", "República Checa": "CZ",
+  "Dinamarca": "DK", "Yibuti": "DJ", "República Dominicana": "DO", "Egipto": "EG", "Guinea Ecuatorial": "GQ",
+  "Etiopía": "ET", "Fiyi": "FJ", "Finlandia": "FI", "Francia": "FR",
+  "Gabón": "GA", "Alemania": "DE", "Grecia": "GR", "Guinea-Bisáu": "GW", "Haití": "HT",
+  "Hungría": "HU", "Islandia": "IS", "Irán": "IR", "Irak": "IQ", "Irlanda": "IE",
+  "Japón": "JP", "Jordania": "JO", "Kazajistán": "KZ", "Kenia": "KE", "Kirguistán": "KG",
+  "Letonia": "LV", "Líbano": "LB", "Lituania": "LT",
+  "Luxemburgo": "LU", "Malaui": "MW", "Malasia": "MY", "Maldivas": "MV", "Malí": "ML",
+  "Islas Marshall": "MH", "Mauricio": "MU", "México": "MX", "Estados Federados de Micronesia": "FM",
+  "Moldavia": "MD", "Mónaco": "MC", "Marruecos": "MA", "Birmania": "MM", "Países Bajos": "NL",
+  "Nueva Zelanda": "NZ", "Níger": "NE", "Corea del Norte": "KP", "Macedonia del Norte": "MK",
+  "Noruega": "NO", "Omán": "OM", "Pakistán": "PK", "Palaos": "PW", "Panamá": "PA",
+  "Papúa Nueva Guinea": "PG", "Perú": "PE", "Filipinas": "PH", "Polonia": "PL", "Catar": "QA",
+  "Rumanía": "RO", "Federación Rusa": "RU", "Ruanda": "RW", "Santo Tomé y Príncipe": "ST",
+  "Arabia Saudita": "SA", "Eslovaquia": "SK", "Eslovenia": "SI", "Islas Salomón": "SB",
+  "Sudáfrica": "ZA", "Sudán del Sur": "SS", "España": "ES", "Sudán": "SD", "Surinam": "SR",
   "Suecia": "SE", "Suiza": "CH", "Siria": "SY", "Tayikistán": "TJ", "Tailandia": "TH",
-  "Timor-Leste": "TL", "Togo": "TG", "Tonga": "TO", "Trinidad y Tobago": "TT", "Túnez": "TN",
-  "Turquía": "TR", "Turkmenistán": "TM", "Tuvalu": "TV", "Uganda": "UG", "Ucrania": "UA",
-  "Emiratos Árabes Unidos": "AE", "Reino Unido": "GB", "República Unida de Tanzania": "TZ",
-  "Estados Unidos de América": "US", "Uruguay": "UY", "Uzbekistán": "UZ", "Vanuatu": "VU",
-  "Venezuela": "VE", "Vietnam": "VN", "Yemen": "YE", "Zambia": "ZM", "Zimbabue": "ZW", "Taiwán": "TW"
+  "Trinidad y Tobago": "TT", "Túnez": "TN", "Turquía": "TR", "Turkmenistán": "TM",
+  "Ucrania": "UA", "República Unida de Tanzania": "TZ",
+  "Estados Unidos de América": "US", "Uzbekistán": "UZ", "Zimbabue": "ZW", "Taiwán": "TW"
 };
 
 type FavoriteBuddy = {
@@ -76,7 +101,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
       setDives(res.data);
       setLoadError('');
     } catch (err) {
-      setLoadError('No se pudieron cargar las inmersiones.');
+      setLoadError('Could not load dives.');
     } finally {
       setLoading(false);
     }
@@ -87,26 +112,26 @@ export default function MyDivesScreen({ navigation, route }: any) {
 
     let next = 0;
     const worker = async () => {
-    while (next < dives.length && isActive()) {
-      const dive = dives[next++];
-      try {
-        const res = await API.get(`/dives/${dive.id}/buddies`);
-        const buddies = res.data;
+      while (next < dives.length && isActive()) {
+        const dive = dives[next++];
+        try {
+          const res = await API.get(`/dives/${dive.id}/buddies`);
+          const buddies = res.data;
 
-        buddies.forEach((b: any) => {
-          if (b.userId === diverId) return;
+          buddies.forEach((b: any) => {
+            if (b.userId === diverId) return;
 
-          if (!buddyCount[b.userId]) {
-            buddyCount[b.userId] = {
-              name: b.name,
-              count: 1,
-            };
-          } else {
-            buddyCount[b.userId].count += 1;
-          }
-        });
-      } catch {}
-    }
+            if (!buddyCount[b.userId]) {
+              buddyCount[b.userId] = {
+                name: b.name,
+                count: 1,
+              };
+            } else {
+              buddyCount[b.userId].count += 1;
+            }
+          });
+        } catch {}
+      }
     };
     await Promise.all(Array.from({ length: Math.min(4, dives.length) }, worker));
 
@@ -206,17 +231,17 @@ export default function MyDivesScreen({ navigation, route }: any) {
       <View style={styles.topInfo}>
         <View style={styles.topInfoText}>
           <Text style={styles.infoText}>
-            DiverID: {diverId ?? '—'}
+            Diver ID: {diverId ?? '—'}
           </Text>
 
           <Text style={styles.subInfoText}>
-            Inmersiones: {dives.length}
+            Dives logged: {dives.length}
           </Text>
         </View>
 
         <TouchableOpacity accessibilityRole="button"
           style={styles.profileButton}
-          accessibilityLabel="Mi perfil"
+          accessibilityLabel="My profile"
           onPress={() => navigation.navigate('Profile', { userId: undefined })}
         >
           <Text style={styles.profileIcon}>👤</Text>
@@ -234,7 +259,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
           }
         >
           <Text style={styles.favoriteTitle}>
-            🤿 Buddy favorito
+            🤿 Favorite buddy
           </Text>
 
           <Text style={styles.favoriteName}>
@@ -242,7 +267,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
           </Text>
 
           <Text style={styles.favoriteCount}>
-            {favoriteBuddy.dives} inmersiones juntos
+            {favoriteBuddy.dives} dives together
           </Text>
         </TouchableOpacity>
       )}
@@ -252,7 +277,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
         onPress={() => navigation.navigate('CreateDive')}
       >
         <Text style={styles.buttonText}>
-          Crear nueva inmersión
+          Create new dive
         </Text>
       </TouchableOpacity>
 
@@ -261,7 +286,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
         onPress={() => navigation.navigate('Invitations')}
       >
         <Text style={styles.buttonText}>
-          Invitaciones pendientes
+          Pending invitations
         </Text>
 
         {hasPendingInvites && (
@@ -278,15 +303,23 @@ export default function MyDivesScreen({ navigation, route }: any) {
       >
         <Text style={styles.groupButtonText}>
           {groupedByCountry
-            ? 'Mostrar sin agrupar'
-            : 'Agrupar por país'}
+            ? 'Show ungrouped'
+            : 'Group by country'}
         </Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        accessibilityRole="button"
+        style={styles.statsButton}
+        onPress={() => navigation.navigate('DiveStats')}
+      >
+        <Text style={styles.statsButtonText}>View dive statistics</Text>
+      </TouchableOpacity>
 
-        {loadError ? <View><Text accessibilityRole="alert" style={styles.statusText}>{loadError}</Text><TouchableOpacity accessibilityRole="button" style={styles.groupButton} onPress={fetchDives}><Text style={styles.groupButtonText}>Reintentar</Text></TouchableOpacity></View> : null}
+
+        {loadError ? <View><Text accessibilityRole="alert" style={styles.statusText}>{loadError}</Text><TouchableOpacity accessibilityRole="button" style={styles.groupButton} onPress={fetchDives}><Text style={styles.groupButtonText}>Retry</Text></TouchableOpacity></View> : null}
       </>}
-      ListEmptyComponent={loading ? <ActivityIndicator accessibilityLabel="Cargando inmersiones" color="#0077CC" /> : !loadError ? <Text style={styles.statusText}>Todavía no tienes inmersiones. Crea tu primera inmersión.</Text> : null}
+      ListEmptyComponent={loading ? <ActivityIndicator accessibilityLabel="Loading dives" color="#0077CC" /> : !loadError ? <Text style={styles.statusText}>You have no logged dives yet. Create your first dive!</Text> : null}
       renderSectionHeader={({ section }) => section.title ? (
         <View style={styles.groupHeaderRow}>
           <Text accessibilityRole="header" style={styles.groupHeader}>{section.title}</Text>
@@ -298,11 +331,11 @@ export default function MyDivesScreen({ navigation, route }: any) {
           <TouchableOpacity accessibilityRole="button" style={styles.diveContent} onPress={() => navigation.navigate('DiveDetail', { diveId: item.id })}>
             <Text style={styles.country}>{item.country}</Text>
             <Text style={styles.title}>{item.location} – {new Date(item.date).toLocaleDateString()}</Text>
-            <Text style={styles.mutedDetails}>Profundidad: {item.maxDepth} m</Text>
-            <Text style={styles.mutedDetails}>Duración: {item.duration} min</Text>
+            <Text style={styles.mutedDetails}>Max depth: {item.maxDepth} m</Text>
+            <Text style={styles.mutedDetails}>Duration: {item.duration} min</Text>
           </TouchableOpacity>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Compartir inmersión en ${item.location}`} style={styles.shareButton} onPress={() => navigation.navigate('InviteBuddy', { diveId: item.id })}>
-            <Text style={styles.shareButtonText}>Compartir</Text>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Share dive at ${item.location}`} style={styles.shareButton} onPress={() => navigation.navigate('InviteBuddy', { diveId: item.id })}>
+            <Text style={styles.shareButtonText}>Share</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -358,8 +391,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
     elevation: 5,
-    // @ts-ignore
-    cursor: 'pointer',
   },
 
   secondaryButton: {
@@ -378,7 +409,7 @@ const styles = StyleSheet.create({
   },
 
   pendingIcon: {
-    backgroundColor: 'red',
+    backgroundColor: '#DC3545',
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -390,6 +421,7 @@ const styles = StyleSheet.create({
   pendingText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 12,
   },
 
   card: {
@@ -404,8 +436,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 6,
-    // @ts-ignore
-    userSelect: 'none',
   },
 
   diveContent: {
@@ -421,21 +451,34 @@ const styles = StyleSheet.create({
 
   groupButton: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     backgroundColor: '#0077CC',
     borderRadius: 20,
     marginBottom: 10,
     marginTop: 15,
     elevation: 3,
-    // @ts-ignore
-    cursor: 'pointer',
   },
 
   groupButtonText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+
+  statsButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#00A8A8',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+
+  statsButtonText: {
+    color: '#00A8A8',
+    fontWeight: 'bold',
   },
 
   title: {

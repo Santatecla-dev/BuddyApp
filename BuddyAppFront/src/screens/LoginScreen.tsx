@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { View, TextInput, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
+import {
+  View,
+  TextInput,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  Image,
+  ScrollView,
+  KeyboardAvoidingView,
+} from 'react-native';
 import API from '../api/api';
 
 export default function LoginScreen({ navigation }: any) {
@@ -16,83 +26,119 @@ export default function LoginScreen({ navigation }: any) {
       navigation.navigate('MyDives');
     } catch (err: any) {
       console.log('Error login:', err.response ? err.response.data : err.message);
-      setError('Credenciales incorrectas');
+      setError('Invalid credentials');
     }
   };
 
   return (
-    <View style={styles.container}>
-      {/* LOGO */}
-      <Image
-        source={{ uri: '/images/buddy.png' }} // 🔹 URL relativa a public
-        style={[styles.logo, Platform.OS === 'web' && styles.webLogo]}
-        resizeMode="contain"
-      />
-
-      <Text style={styles.label}>Email</Text>
-      <TextInput
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        style={styles.input}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-
-      <Text style={styles.label}>Contraseña</Text>
-      <TextInput
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        style={styles.input}
-        secureTextEntry
-      />
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <TouchableOpacity style={styles.button} onPress={login}>
-        <Text style={styles.buttonText}>Login</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.button, styles.registerButton]}
-        onPress={() => navigation.navigate('Register')}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.buttonText}>Registrarse</Text>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.card}>
+          {/* LOGO */}
+          <Image
+            source={require('../assets/Buddy.png')}
+            style={styles.logo}
+            resizeMode="contain"
+            accessibilityLabel="Buddy App Logo"
+          />
+
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            style={styles.input}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            accessibilityLabel="Email"
+          />
+
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            style={styles.input}
+            secureTextEntry
+            accessibilityLabel="Password"
+          />
+
+          {error ? (
+            <Text accessibilityRole="alert" style={styles.error}>
+              {error}
+            </Text>
+          ) : null}
+
+          <TouchableOpacity
+            style={styles.button}
+            onPress={login}
+            accessibilityRole="button"
+          >
+            <Text style={styles.buttonText}>Log In</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.registerButton]}
+            onPress={() => navigation.navigate('Register')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.buttonText}>Register</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20 },
-
-  logo: {
-    width: 150,
-    height: 150,
-    alignSelf: 'center',
-    marginBottom: 30,
+  container: {
+    flex: 1,
+    backgroundColor: '#f7f9fc',
   },
 
-  webLogo: {
-    width: 300,
-    height: 260,
-    marginBottom: 62,
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+
+  card: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+  },
+
+  logo: {
+    width: 240,
+    maxWidth: '80%',
+    height: 140,
+    alignSelf: 'center',
+    marginBottom: 24,
   },
 
   label: {
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 6,
     color: '#0077CC',
+    fontSize: 14,
   },
 
   input: {
     borderWidth: 1,
     borderColor: '#0077CC',
     backgroundColor: 'white',
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 14,
+    fontSize: 16,
+    color: '#333',
   },
 
   button: {
@@ -125,8 +171,10 @@ const styles = StyleSheet.create({
   },
 
   error: {
-    color: 'red',
+    color: '#D32F2F',
     marginBottom: 10,
     textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

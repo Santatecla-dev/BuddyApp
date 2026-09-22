@@ -48,7 +48,7 @@ export default function InvitationsScreen() {
     const groups: Record<string, BuddyInviteGroup> = {};
 
     invites.forEach((invite) => {
-      const buddy = invite.invitedByUser?.name || 'Buddy sin nombre';
+      const buddy = invite.invitedByUser?.name || 'Unnamed buddy';
       if (!groups[buddy]) {
         groups[buddy] = { key: buddy, buddy, invites: [] };
       }
@@ -58,30 +58,34 @@ export default function InvitationsScreen() {
     return Object.values(groups);
   };
 
-  const renderInviteCard = (item: DiveInvite, grouped = false) => (
-    <View style={[styles.card, Platform.OS === 'web' && styles.webCard]}>
+  const renderInviteCard = (item: DiveInvite) => (
+    <View style={styles.card}>
       <Text style={styles.title}>
         {item.dive.location} ·{' '}
         {new Date(item.dive.date).toLocaleDateString()}
       </Text>
 
       <Text style={styles.subtitle}>
-        Invitado por: {item.invitedByUser.name}
+        Invited by: {item.invitedByUser?.name || 'Buddy'}
       </Text>
 
       <View style={styles.actions}>
         <TouchableOpacity
-          style={[styles.button, styles.acceptButton, Platform.OS === 'web' && styles.webAcceptButton]}
+          style={[styles.button, styles.acceptButton]}
           onPress={() => respond(item.id, true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Accept invitation for ${item.dive.location}`}
         >
-          <Text style={styles.buttonText}>Aceptar</Text>
+          <Text style={styles.buttonText}>Accept</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.button, styles.rejectButton, Platform.OS === 'web' && styles.webRejectButton]}
+          style={[styles.button, styles.rejectButton]}
           onPress={() => respond(item.id, false)}
+          accessibilityRole="button"
+          accessibilityLabel={`Decline invitation for ${item.dive.location}`}
         >
-          <Text style={styles.buttonText}>Rechazar</Text>
+          <Text style={styles.buttonText}>Decline</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -94,17 +98,23 @@ export default function InvitationsScreen() {
 
     const group = item as BuddyInviteGroup;
     return (
-      <View style={[styles.groupSection, Platform.OS === 'web' && styles.webGroupSection]}>
-        <View style={[styles.groupHeader, Platform.OS === 'web' && styles.webGroupHeader]}>
-          <Text style={styles.groupHeaderLabel}>Buddy</Text>
-          <Text style={styles.groupHeaderName} numberOfLines={1}>{group.buddy}</Text>
-          <Text style={styles.groupHeaderCount}>{group.invites.length} invitación{group.invites.length === 1 ? '' : 'es'}</Text>
+      <View style={styles.groupSection}>
+        <View style={styles.groupHeader}>
+          <Text style={styles.groupHeaderLabel}>BUDDY</Text>
+          <Text style={styles.groupHeaderName} numberOfLines={1}>
+            {group.buddy}
+          </Text>
+          <Text style={styles.groupHeaderCount}>
+            {group.invites.length} invitation{group.invites.length === 1 ? '' : 's'}
+          </Text>
         </View>
-        {group.invites.map((invite) => (
-          <View key={invite.id} style={styles.groupedInvite}>
-            {renderInviteCard(invite, true)}
-          </View>
-        ))}
+        <View style={styles.groupCardsContainer}>
+          {group.invites.map((invite) => (
+            <View key={invite.id} style={styles.groupedInvite}>
+              {renderInviteCard(invite)}
+            </View>
+          ))}
+        </View>
       </View>
     );
   };
@@ -116,23 +126,29 @@ export default function InvitationsScreen() {
   return (
     <View style={styles.container}>
       <FlatList
+        contentContainerStyle={styles.listContent}
         data={listData}
-        keyExtractor={(item) => groupedByBuddy ? (item as BuddyInviteGroup).key : (item as DiveInvite).id.toString()}
+        keyExtractor={(item) =>
+          groupedByBuddy
+            ? (item as BuddyInviteGroup).key
+            : (item as DiveInvite).id.toString()
+        }
         renderItem={renderItem}
-        scrollEnabled={Platform.OS !== 'web'}
         ListHeaderComponent={
           <TouchableOpacity
             style={styles.groupToggle}
             onPress={() => setGroupedByBuddy((value) => !value)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: groupedByBuddy }}
           >
             <Text style={styles.groupToggleText}>
-              {groupedByBuddy ? 'Mostrar todas' : 'Agrupar por buddy'}
+              {groupedByBuddy ? 'Show all' : 'Group by buddy'}
             </Text>
           </TouchableOpacity>
         }
         ListEmptyComponent={
           <Text style={styles.emptyText}>
-            No tienes invitaciones pendientes 🤿
+            You have no pending invitations 🤿
           </Text>
         }
       />
@@ -143,49 +159,57 @@ export default function InvitationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f7f9fc',
+  },
+
+  listContent: {
+    width: '100%',
+    maxWidth: 1050,
+    alignSelf: 'center',
     padding: 20,
+    paddingBottom: 40,
   },
 
   card: {
     backgroundColor: 'white',
-    padding: 16,
+    padding: 18,
     borderRadius: 16,
-    marginBottom: 15,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 5,
       },
       android: {
         elevation: 4,
       },
+      web: {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+      } as any,
     }),
   },
-
-  webCard: {
-    width: 'calc(100% + 96px)',
-    marginLeft: -48,
-    overflow: 'hidden',
-    boxShadow: '0 10px 22px rgba(0, 0, 0, 0.32)',
-  } as any,
 
   title: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 6,
+    color: '#1a202c',
   },
 
   subtitle: {
     fontSize: 14,
     color: '#555',
-    marginBottom: 12,
+    marginBottom: 14,
   },
 
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 12,
   },
 
   button: {
@@ -193,23 +217,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 25,
     alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
   },
 
   acceptButton: {
-    backgroundColor: '#2ECC71',
-    marginRight: 10,
+    backgroundColor: '#28A745',
   },
 
   rejectButton: {
-    backgroundColor: '#E74C3C',
+    backgroundColor: '#DC3545',
   },
-
-  webAcceptButton: { backgroundColor: '#E74C3C' },
-  webRejectButton: { backgroundColor: '#2ECC71' },
 
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 15,
   },
 
   emptyText: {
@@ -223,38 +246,32 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: '#0077CC',
     borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    marginBottom: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    marginBottom: 20,
   },
 
   groupToggleText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 14,
   },
 
   groupSection: {
-    marginBottom: 18,
+    marginBottom: 24,
   },
 
-  webGroupSection: {
-    flexDirection: 'row',
-    flexWrap: 'nowrap',
-    alignItems: 'stretch',
-    marginHorizontal: -12,
-  } as any,
+  groupCardsContainer: {
+    width: '100%',
+  },
 
   groupHeader: {
-    backgroundColor: '#f2f8ff',
+    backgroundColor: '#eef6fc',
     borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-  },
-
-  webGroupHeader: {
-    width: 150,
-    marginRight: 8,
-    marginBottom: 0,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#d0e3f5',
   },
 
   groupHeaderLabel: {
@@ -262,22 +279,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     marginBottom: 4,
+    letterSpacing: 0.5,
   },
 
   groupHeaderName: {
     color: '#0077CC',
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: 'bold',
   },
 
   groupHeaderCount: {
     color: '#555',
-    fontSize: 12,
-    marginTop: 5,
+    fontSize: 13,
+    marginTop: 4,
   },
 
   groupedInvite: {
-    flex: 1,
-    minWidth: 280,
+    width: '100%',
   },
 });
