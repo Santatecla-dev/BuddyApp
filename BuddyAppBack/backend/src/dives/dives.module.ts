@@ -10,10 +10,14 @@ import { PokedexController } from './pokedex.controller';
 import { PlannedDive } from './planned-dive.entity';
 import { PlannedDivesController } from './planned-dives.controller';
 import { PlannedDivesService } from './planned-dives.service';
+import { DiveTrip } from './dive-trip.entity';
+import { TripPlannedDive } from './trip-planned-dive.entity';
+import { DiveTripsController } from './dive-trips.controller';
+import { DiveTripsService } from './dive-trips.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Dive, DiveBuddy, DiveInvite, DiveSighting, PlannedDive])],
-  providers: [DivesService, PlannedDivesService],
-  controllers: [DivesController, PokedexController, PlannedDivesController],
+  imports: [TypeOrmModule.forFeature([Dive, DiveBuddy, DiveInvite, DiveSighting, PlannedDive, DiveTrip, TripPlannedDive])],
+  providers: [DivesService, PlannedDivesService, DiveTripsService],
+  controllers: [DivesController, PokedexController, PlannedDivesController, DiveTripsController],
 })
 export class DivesModule {}

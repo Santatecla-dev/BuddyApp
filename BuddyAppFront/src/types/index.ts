@@ -49,6 +49,22 @@ export interface PlannedDive {
   updatedAt: string;
 }
 
+export type DiveTripStatus = 'upcoming' | 'completed' | 'cancelled';
+
+export interface DiveTrip {
+  id: number;
+  userId: number;
+  name: string;
+  destination: string;
+  startDate: string;
+  endDate: string;
+  notes?: string | null;
+  status: DiveTripStatus;
+  createdAt: string;
+  updatedAt: string;
+  plannedDives: PlannedDive[];
+}
+
 export type PokedexCategory = 'Sharks' | 'Tropical fish' | 'Macro' | 'Crustaceans' | 'Rays' | 'Pelagic';
 
 export interface PokedexSpecies {

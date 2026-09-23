@@ -272,32 +272,32 @@ export default function MyDivesScreen({ navigation, route }: any) {
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity accessibilityRole="button"
-        style={styles.mainButton}
-        onPress={() => navigation.navigate('CreateDive')}
-      >
-        <Text style={styles.buttonText}>
-          Create new dive
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.primaryActions}>
+        <TouchableOpacity accessibilityRole="button"
+          style={styles.mainButton}
+          onPress={() => navigation.navigate('CreateDive')}
+        >
+          <Text style={styles.buttonText}>Create new dive</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity accessibilityRole="button"
+          style={styles.secondaryButton}
+          onPress={() => navigation.navigate('Invitations')}
+        >
+          <Text style={styles.buttonText}>Pending invitations</Text>
+
+          {hasPendingInvites && (
+            <View style={styles.pendingIcon}>
+              <Text style={styles.pendingText}>!</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.actionGrid}>
 
       <TouchableOpacity accessibilityRole="button"
-        style={styles.secondaryButton}
-        onPress={() => navigation.navigate('Invitations')}
-      >
-        <Text style={styles.buttonText}>
-          Pending invitations
-        </Text>
-
-        {hasPendingInvites && (
-          <View style={styles.pendingIcon}>
-            <Text style={styles.pendingText}>!</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity accessibilityRole="button"
-        style={styles.groupButton}
+        style={[styles.groupButton, styles.actionGridButton]}
         accessibilityState={{ expanded: groupedByCountry }}
         onPress={() => setGroupedByCountry(value => !value)}
       >
@@ -310,7 +310,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
 
       <TouchableOpacity
         accessibilityRole="button"
-        style={styles.statsButton}
+        style={[styles.statsButton, styles.actionGridButton]}
         onPress={() => navigation.navigate('DiveStats')}
       >
         <Text style={styles.statsButtonText}>View dive statistics</Text>
@@ -318,7 +318,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
 
       <TouchableOpacity
         accessibilityRole="button"
-        style={styles.planButton}
+        style={[styles.planButton, styles.actionGridButton]}
         onPress={() => navigation.navigate('PlanDive')}
       >
         <Text style={styles.planButtonText}>Plan a new dive</Text>
@@ -326,7 +326,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
 
       <TouchableOpacity
         accessibilityRole="button"
-        style={styles.plannedButton}
+        style={[styles.plannedButton, styles.actionGridButton]}
         onPress={() => navigation.navigate('PlannedDives')}
       >
         <Text style={styles.plannedButtonText}>View planned dives</Text>
@@ -334,7 +334,15 @@ export default function MyDivesScreen({ navigation, route }: any) {
 
       <TouchableOpacity
         accessibilityRole="button"
-        style={styles.mapButton}
+        style={[styles.tripButton, styles.actionGridButton]}
+        onPress={() => navigation.navigate('DiveTrips')}
+      >
+        <Text style={styles.tripButtonText}>Organize a dive trip</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        accessibilityRole="button"
+        style={[styles.mapButton, styles.actionGridButton]}
         onPress={() => navigation.navigate('DiveMap')}
       >
         <Text style={styles.mapButtonText}>Explore dive map</Text>
@@ -342,11 +350,13 @@ export default function MyDivesScreen({ navigation, route }: any) {
 
       <TouchableOpacity
         accessibilityRole="button"
-        style={styles.pokedexButton}
+        style={[styles.pokedexButton, styles.actionGridButton]}
         onPress={() => navigation.navigate('Pokedex')}
       >
         <Text style={styles.pokedexButtonText}>Open marine Pokedex</Text>
       </TouchableOpacity>
+
+      </View>
 
 
         {loadError ? <View><Text accessibilityRole="alert" style={styles.statusText}>{loadError}</Text><TouchableOpacity accessibilityRole="button" style={styles.groupButton} onPress={fetchDives}><Text style={styles.groupButtonText}>Retry</Text></TouchableOpacity></View> : null}
@@ -416,22 +426,52 @@ const styles = StyleSheet.create({
     color: '#0077CC',
   },
 
+  primaryActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 8,
+  },
+
+  actionGridButton: {
+    flexGrow: 1,
+    flexBasis: 260,
+    minWidth: 190,
+    minHeight: 48,
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+    marginTop: 0,
+    marginBottom: 0,
+  },
+
   mainButton: {
+    flex: 1,
+    minWidth: 220,
     backgroundColor: '#0077CC',
     padding: 15,
     borderRadius: 30,
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 0,
     elevation: 5,
   },
 
   secondaryButton: {
+    flex: 1,
+    minWidth: 220,
     backgroundColor: '#00A8A8',
     padding: 15,
     borderRadius: 30,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
+    marginBottom: 0,
     elevation: 5,
   },
 
@@ -542,6 +582,22 @@ const styles = StyleSheet.create({
 
   plannedButtonText: {
     color: '#008d8d',
+    fontWeight: 'bold',
+  },
+
+  tripButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#7c6ac7',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    backgroundColor: '#f2efff',
+  },
+
+  tripButtonText: {
+    color: '#5d4ab0',
     fontWeight: 'bold',
   },
 
