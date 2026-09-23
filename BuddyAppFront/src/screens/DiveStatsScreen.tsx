@@ -63,7 +63,7 @@ export default function DiveStatsScreen() {
 
       <View style={styles.rangeRow}>
         {([['all', 'All time'], ['year', 'Last year'], ['month', 'Last month']] as [StatsRange, string][]).map(([value, label]) => (
-          <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: range === value }}
+          <TouchableOpacity key={value} accessibilityRole="button" aria-pressed={range === value} accessibilityState={{ selected: range === value }}
             accessibilityHint={value === 'all' ? 'Show all logged dives' : 'Show dives from the previous calendar ' + value}
             style={[styles.rangeButton, range === value && styles.rangeButtonActive]} onPress={() => { setNow(new Date()); setRange(value); }}>
             <Text style={[styles.rangeText, range === value && styles.rangeTextActive]}>{label}</Text>

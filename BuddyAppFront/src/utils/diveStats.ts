@@ -1,4 +1,5 @@
 import { Dive } from '../types';
+import { canonicalCountryKey } from './countries';
 
 export type StatsRange = 'all' | 'year' | 'month';
 
@@ -33,6 +34,7 @@ export function summarizeDives(dives: Dive[]) {
   let deepestDive: Dive | null = null;
   let longestDive: Dive | null = null;
   const counts = new Map<string, number>();
+  const countryLabels = new Map<string, string>();
   const recent: Dive[] = [];
   for (const dive of dives) {
     totalDepth += dive.maxDepth;
@@ -40,7 +42,11 @@ export function summarizeDives(dives: Dive[]) {
     if (!deepestDive || dive.maxDepth > deepestDive.maxDepth) deepestDive = dive;
     if (!longestDive || dive.duration > longestDive.duration) longestDive = dive;
     const country = dive.country?.trim();
-    if (country) counts.set(country, (counts.get(country) || 0) + 1);
+    if (country) {
+      const key = canonicalCountryKey(country);
+      counts.set(key, (counts.get(key) || 0) + 1);
+      if (!countryLabels.has(key)) countryLabels.set(key, country);
+    }
     if (Number.isFinite(diveDate(dive.date).getTime())) {
       recent.push(dive);
       recent.sort((a, b) => diveDate(a.date).getTime() - diveDate(b.date).getTime() || a.id - b.id);
@@ -52,7 +58,8 @@ export function summarizeDives(dives: Dive[]) {
     totalMinutes,
     deepestDive,
     longestDive,
-    countries: [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+    countries: [...counts.entries()].map(([key, count]): [string, number] => [countryLabels.get(key)!, count])
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
     recent,
     maxDuration: Math.max(1, ...recent.map(dive => dive.duration)),
   };
