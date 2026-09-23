@@ -15,7 +15,7 @@ import { Picker } from '@react-native-picker/picker';
 import API from '../api/api';
 import { PokedexSpecies } from '../types';
 
-const COUNTRIES = [
+export const COUNTRIES = [
   'Afghanistan','Albania','Algeria','Andorra','Angola','Antigua and Barbuda','Argentina','Armenia','Australia','Austria','Azerbaijan',
   'Bahamas','Bahrain','Bangladesh','Barbados','Belarus','Belgium','Belize','Benin','Bhutan','Bolivia','Bosnia and Herzegovina',
   'Botswana','Brazil','Brunei','Bulgaria','Burkina Faso','Burundi','Cabo Verde','Cambodia','Cameroon','Canada','Central African Republic',

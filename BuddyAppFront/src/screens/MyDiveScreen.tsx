@@ -326,6 +326,14 @@ export default function MyDivesScreen({ navigation, route }: any) {
 
       <TouchableOpacity
         accessibilityRole="button"
+        style={styles.plannedButton}
+        onPress={() => navigation.navigate('PlannedDives')}
+      >
+        <Text style={styles.plannedButtonText}>View planned dives</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        accessibilityRole="button"
         style={styles.mapButton}
         onPress={() => navigation.navigate('DiveMap')}
       >
@@ -518,6 +526,22 @@ const styles = StyleSheet.create({
 
   planButtonText: {
     color: '#0077CC',
+    fontWeight: 'bold',
+  },
+
+  plannedButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#00A8A8',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    backgroundColor: '#e8faf7',
+  },
+
+  plannedButtonText: {
+    color: '#008d8d',
     fontWeight: 'bold',
   },
 

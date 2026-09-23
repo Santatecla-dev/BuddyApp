@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import API from '../api/api';
+import { COUNTRIES } from './CreateDiveScreen';
 
 type ChecklistItem = {
   id: string;
@@ -32,6 +36,7 @@ const CONDITIONS = ['Calm', 'Good', 'Choppy', 'Low visibility'];
 const GAS_OPTIONS = ['Air', 'Nitrox 32', 'Nitrox 36', 'Trimix'];
 
 export default function PlanDiveScreen({ navigation }: any) {
+  const [country, setCountry] = useState('');
   const [site, setSite] = useState('');
   const [date, setDate] = useState('');
   const [depth, setDepth] = useState('25');
@@ -43,6 +48,8 @@ export default function PlanDiveScreen({ navigation }: any) {
   const [notes, setNotes] = useState('');
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const completed = useMemo(() => CHECKLIST.filter((item) => checked[item.id]).length, [checked]);
   const groupedChecklist = useMemo(() => {
@@ -57,8 +64,53 @@ export default function PlanDiveScreen({ navigation }: any) {
     setSaved(false);
   };
 
-  const savePlan = () => {
-    setSaved(true);
+  const savePlan = async () => {
+    setSaveError('');
+    const dateMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(date.trim());
+    const isoDateMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(date.trim());
+    const day = dateMatch ? Number(dateMatch[1]) : isoDateMatch ? Number(isoDateMatch[3]) : 0;
+    const month = dateMatch ? Number(dateMatch[2]) : isoDateMatch ? Number(isoDateMatch[2]) : 0;
+    const year = dateMatch ? Number(dateMatch[3]) : isoDateMatch ? Number(isoDateMatch[1]) : 0;
+    const parsedDate = day && month && year
+      ? new Date(year, month - 1, day, 12, 0, 0)
+      : null;
+    if (!country || !site.trim() || (!dateMatch && !isoDateMatch) || !parsedDate || Number.isNaN(parsedDate.getTime())
+      || parsedDate.getDate() !== day || parsedDate.getMonth() !== month - 1
+      || parsedDate.getFullYear() !== year) {
+      setSaveError('Add a valid country, dive site and date (DD/MM/YYYY) before saving.');
+      return;
+    }
+    const maxDepth = Number(depth);
+    const plannedDuration = Number(duration);
+    if (!Number.isFinite(maxDepth) || maxDepth < 1 || !Number.isInteger(plannedDuration) || plannedDuration < 1) {
+      setSaveError('Depth and duration must be valid positive numbers.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await API.post('/planned-dives', {
+        date: parsedDate.toISOString(),
+        country,
+        location: site.trim(),
+        maxDepth,
+        duration: plannedDuration,
+        buddy: buddy.trim() || 'Solo diver',
+        condition,
+        gas,
+        shoreEntry,
+        notes: notes.trim() || undefined,
+        checklist: checked,
+      });
+      setSaved(true);
+      navigation.navigate('PlannedDives');
+    } catch (error: any) {
+      const message = error?.response?.data?.message;
+      const readableMessage = Array.isArray(message) ? message[0] : message || 'Could not save this plan. Please try again.';
+      setSaveError(readableMessage);
+      Alert.alert('Could not save plan', readableMessage);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -83,6 +135,18 @@ export default function PlanDiveScreen({ navigation }: any) {
         <View style={[styles.formGrid, Platform.OS === 'web' && styles.webFormGrid]}>
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>Dive details</Text>
+            <Text style={styles.label}>Country</Text>
+            <View style={styles.pickerWrap}>
+              <Picker
+                accessibilityLabel="Planned dive country"
+                selectedValue={country}
+                onValueChange={setCountry}
+                style={styles.picker}
+              >
+                <Picker.Item label="Select a country" value="" />
+                {COUNTRIES.map((option) => <Picker.Item key={option} label={option} value={option} />)}
+              </Picker>
+            </View>
             <Text style={styles.label}>Dive site</Text>
             <TextInput
               accessibilityLabel="Dive site"
@@ -233,11 +297,11 @@ export default function PlanDiveScreen({ navigation }: any) {
 
       <View style={[styles.saveBar, Platform.OS === 'web' && styles.webSaveBar]}>
         <View style={styles.saveCopy}>
-          <Text style={styles.saveTitle}>{saved ? 'Plan saved locally' : 'Ready to plan?'}</Text>
-          <Text style={styles.saveHint}>{saved ? 'You can keep editing this plan.' : `${completed}/${CHECKLIST.length} equipment checks complete`}</Text>
+          <Text style={styles.saveTitle}>{saved ? 'Plan saved' : 'Ready to plan?'}</Text>
+          <Text style={saveError ? styles.saveErrorText : styles.saveHint}>{saveError || (saved ? 'Opening your planned dives.' : `${completed}/${CHECKLIST.length} equipment checks complete`)}</Text>
         </View>
-        <TouchableOpacity accessibilityRole="button" onPress={savePlan} style={styles.saveButton}>
-          <Text style={styles.saveButtonText}>{saved ? 'Saved' : 'Save plan'}</Text>
+        <TouchableOpacity accessibilityRole="button" disabled={saving} onPress={savePlan} style={[styles.saveButton, saving && styles.saveButtonDisabled]}>
+          <Text style={styles.saveButtonText}>{saving ? 'Saving…' : saved ? 'Saved' : 'Save plan'}</Text>
         </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('CreateDive')} style={styles.logButton}>
           <Text style={styles.logButtonText}>Log dive</Text>
@@ -248,10 +312,10 @@ export default function PlanDiveScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f7f9fc' },
+  screen: { flex: 1, backgroundColor: '#f7f9fc', overflow: 'hidden' },
   container: { flex: 1 },
-  content: { width: '100%', maxWidth: 1120, alignSelf: 'center', padding: 20, paddingBottom: 42 },
-  hero: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e7f6fb', borderRadius: 22, padding: 24, marginBottom: 18, borderWidth: 1, borderColor: '#c5e9f3' },
+  content: { width: '100%', maxWidth: 1120, alignSelf: 'center', padding: 20, paddingBottom: 28 },
+  hero: { minWidth: 780, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e7f6fb', borderRadius: 22, padding: 24, marginBottom: 18, borderWidth: 1, borderColor: '#c5e9f3', overflow: 'hidden' },
   webHero: { zIndex: 8, marginBottom: -8, boxShadow: '0 10px 24px rgba(0, 119, 204, 0.16)' } as any,
   heroCopy: { flex: 1, paddingRight: 20 },
   eyebrow: { color: '#00A8A8', fontSize: 11, fontWeight: 'bold', letterSpacing: 1.2, marginBottom: 7 },
@@ -260,23 +324,25 @@ const styles = StyleSheet.create({
   progressBadge: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 5, borderColor: '#00A8A8' },
   progressValue: { color: '#0077CC', fontWeight: 'bold', fontSize: 22 },
   progressLabel: { color: '#587080', fontSize: 12, marginTop: 2 },
-  formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginBottom: 18 },
+  formGrid: { flexDirection: 'row', flexWrap: 'nowrap', gap: 18, marginBottom: 18 },
   webFormGrid: { flexWrap: 'nowrap', width: 1040 },
-  panel: { flex: 1, minWidth: 300, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#dbe6ee', padding: 20, marginBottom: 18 },
+  panel: { flex: 1, minWidth: 460, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#dbe6ee', padding: 20, marginBottom: 18 },
   webEquipmentPanel: { minWidth: 470, marginLeft: -28, zIndex: 2, boxShadow: '0 14px 24px rgba(0, 119, 204, 0.18)' } as any,
   panelTitle: { color: '#1e293b', fontSize: 19, fontWeight: 'bold', marginBottom: 5 },
   panelSubtitle: { color: '#6b7c8d', fontSize: 13, marginBottom: 16 },
   label: { color: '#334155', fontSize: 13, fontWeight: 'bold', marginTop: 14, marginBottom: 7 },
-  input: { width: '100%', minWidth: 0, minHeight: 48, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 13, paddingVertical: 11, color: '#1e293b', fontSize: 15 },
-  twoFields: { flexDirection: 'row', gap: 12 },
-  fieldHalf: { flex: 1, minWidth: 0 },
-  conditionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  input: { width: '100%', minWidth: 0, minHeight: 48, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 13, paddingVertical: 11, color: '#fff', fontSize: 15 },
+  pickerWrap: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', overflow: 'hidden' },
+  picker: { height: 48, color: '#fff' },
+  twoFields: { flexDirection: 'row', flexWrap: 'nowrap', gap: 12 },
+  fieldHalf: { flex: 1, minWidth: 210 },
+  conditionRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 8 },
   webConditionRow: { width: 570, flexWrap: 'nowrap' },
-  chip: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#fff' },
-  chipActive: { backgroundColor: '#0077CC', borderColor: '#0077CC' },
+  chip: { minWidth: 112, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#fff' },
+  chipActive: { backgroundColor: '#e7f6fb', borderColor: '#b8d8ee' },
   chipText: { color: '#0077CC', fontSize: 13, fontWeight: 'bold' },
-  chipTextActive: { color: '#fff' },
-  gasRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chipTextActive: { color: '#b8d8ee' },
+  gasRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 8 },
   webGasRow: { width: 540, flexWrap: 'nowrap' },
   gasOption: { minWidth: 92, borderRadius: 13, borderWidth: 1, borderColor: '#c9e4f4', padding: 11, alignItems: 'center', backgroundColor: '#f7fbff' },
   gasOptionActive: { backgroundColor: '#e2f7f5', borderColor: '#00A8A8' },
@@ -295,7 +361,7 @@ const styles = StyleSheet.create({
   checklistGroups: { gap: 18 },
   webChecklistPanel: { overflow: 'hidden', boxShadow: '0 12px 22px rgba(0, 0, 0, 0.2)' } as any,
   webChecklistGroups: { width: 1010, flexDirection: 'row', flexWrap: 'nowrap', gap: 18 },
-  checklistGroup: { flex: 1, minWidth: 260 },
+  checklistGroup: { flex: 1, minWidth: 330 },
   groupLabel: { color: '#0077CC', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 9 },
   checkItem: { minHeight: 62, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fbfd', borderRadius: 14, borderWidth: 1, borderColor: '#e0edf4', paddingHorizontal: 12, paddingVertical: 10, marginBottom: 9 },
   checkItemActive: { backgroundColor: '#edfbf9', borderColor: '#91ddd5' },
@@ -303,15 +369,17 @@ const styles = StyleSheet.create({
   checkboxActive: { backgroundColor: '#00A8A8', borderColor: '#00A8A8' },
   checkmark: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
   checkLabel: { color: '#334155', flex: 1, fontSize: 13 },
-  notesInput: { minHeight: 100, textAlignVertical: 'top' },
+  notesInput: { minHeight: 100, width: 720, textAlignVertical: 'top' },
   webNotesPanel: { marginTop: -12, zIndex: 1 },
-  saveBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#dbe6ee' },
+  saveBar: { flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#dbe6ee' },
   webSaveBar: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 78, zIndex: 20, boxShadow: '0 -8px 18px rgba(15, 23, 42, 0.2)' } as any,
-  saveCopy: { flex: 1 },
+  saveCopy: { flex: 1, minWidth: 330 },
   saveTitle: { color: '#1e293b', fontWeight: 'bold', fontSize: 14 },
   saveHint: { color: '#728396', fontSize: 12, marginTop: 3 },
-  saveButton: { backgroundColor: '#0077CC', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 12, minWidth: 105, alignItems: 'center' },
+  saveErrorText: { color: '#a43b3b', fontSize: 12, marginTop: 3, fontWeight: 'bold' },
+  saveButton: { backgroundColor: '#0077CC', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 12, minWidth: 145, alignItems: 'center' },
+  saveButtonDisabled: { opacity: 0.55 },
   saveButtonText: { color: '#fff', fontWeight: 'bold' },
-  logButton: { borderWidth: 1, borderColor: '#00A8A8', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, minWidth: 90, alignItems: 'center' },
+  logButton: { borderWidth: 1, borderColor: '#00A8A8', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, minWidth: 120, alignItems: 'center' },
   logButtonText: { color: '#008d8d', fontWeight: 'bold' },
 });

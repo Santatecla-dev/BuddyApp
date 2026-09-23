@@ -28,6 +28,27 @@ export interface DiveInvite {
   status: string;
 }
 
+export type PlannedDiveStatus = 'upcoming' | 'logged' | 'cancelled';
+
+export interface PlannedDive {
+  id: number;
+  userId: number;
+  date: string;
+  country: string;
+  location: string;
+  maxDepth: number;
+  duration: number;
+  buddy: string;
+  condition: string;
+  gas: string;
+  shoreEntry: boolean;
+  notes?: string | null;
+  checklist?: Record<string, boolean> | null;
+  status: PlannedDiveStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type PokedexCategory = 'Sharks' | 'Tropical fish' | 'Macro' | 'Crustaceans' | 'Rays' | 'Pelagic';
 
 export interface PokedexSpecies {
