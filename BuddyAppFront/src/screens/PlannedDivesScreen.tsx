@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +11,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import API from '../api/api';
 import { PlannedDive } from '../types';
+import { completeChecklist } from '../utils/plannedDiveChecklist';
 
 type Filter = 'all' | 'week' | 'later';
 
@@ -23,7 +23,7 @@ const formatDate = (value: string) => {
 };
 
 const checklistProgress = (plan: PlannedDive) => {
-  const values = Object.values(plan.checklist || {});
+  const values = Object.values(completeChecklist(plan.checklist));
   return { done: values.filter(Boolean).length, total: values.length };
 };
 
@@ -53,13 +53,15 @@ export default function PlannedDivesScreen({ navigation }: any) {
   }, [fetchPlans]));
 
   const visiblePlans = useMemo(() => {
-    const now = Date.now();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const now = today.getTime();
     const week = now + 7 * 86400000;
     const normalizedQuery = query.trim().toLowerCase();
     return plans.filter((plan) => {
       const timestamp = new Date(plan.date).getTime();
       const matchesFilter = filter === 'all'
-        || (filter === 'week' && timestamp <= week)
+        || (filter === 'week' && timestamp >= now && timestamp < week)
         || (filter === 'later' && timestamp > week);
       const matchesQuery = !normalizedQuery
         || `${plan.location} ${plan.country} ${plan.buddy}`.toLowerCase().includes(normalizedQuery);
@@ -136,7 +138,7 @@ export default function PlannedDivesScreen({ navigation }: any) {
                   <Text style={styles.date}>{formatDate(plan.date)}</Text>
                   <Text style={styles.chevron}>›</Text>
                 </View>
-                <Text style={styles.location} numberOfLines={1}>{plan.location}</Text>
+                <Text style={styles.location}>{plan.location}</Text>
                 <Text style={styles.country}>{plan.country} · {plan.buddy}</Text>
                 <View style={styles.metrics}>
                   <Text style={styles.metric}>{plan.maxDepth} m</Text>
@@ -158,32 +160,32 @@ export default function PlannedDivesScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f7f9fc', overflow: 'hidden' },
-  content: { width: '100%', minWidth: 900, maxWidth: 1120, alignSelf: 'center', padding: 20, paddingBottom: 42 },
-  hero: { minWidth: 860, flexDirection: 'row', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e7f6fb', borderRadius: 22, padding: 24, marginBottom: 18, borderWidth: 1, borderColor: '#c5e9f3', gap: 16 },
-  heroCopy: { flex: 1, minWidth: 620 },
+  content: { width: '100%', maxWidth: 1120, alignSelf: 'center', padding: 20, paddingBottom: 42 },
+  hero: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e7f6fb', borderRadius: 22, padding: 24, marginBottom: 18, borderWidth: 1, borderColor: '#c5e9f3', gap: 16 },
+  heroCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 420, minWidth: 0 },
   eyebrow: { color: '#00A8A8', fontSize: 11, fontWeight: 'bold', letterSpacing: 1.2, marginBottom: 7 },
   title: { color: '#0077CC', fontSize: 28, fontWeight: 'bold' },
   subtitle: { color: '#425466', fontSize: 15, marginTop: 7, lineHeight: 21 },
   primaryButton: { backgroundColor: '#0077CC', borderRadius: 22, paddingHorizontal: 17, paddingVertical: 12, alignItems: 'center' },
   primaryButtonText: { color: '#fff', fontWeight: 'bold' },
-  toolbar: { flexDirection: 'row', flexWrap: 'nowrap', backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#dbe6ee', padding: 14, marginBottom: 18, gap: 12 },
-  searchInput: { width: 510, minHeight: 46, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 13, paddingHorizontal: 13, color: '#fff', fontSize: 15 },
-  filters: { flexDirection: 'row', flexWrap: 'nowrap', gap: 8 },
-  filterChip: { minWidth: 115, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: '#fff' },
-  filterChipActive: { backgroundColor: '#fff', borderColor: '#b8d8ee' },
+  toolbar: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#dbe6ee', padding: 14, marginBottom: 18, gap: 12 },
+  searchInput: { flexGrow: 1, flexShrink: 1, flexBasis: 360, minWidth: 0, minHeight: 46, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 13, paddingHorizontal: 13, color: '#334155', backgroundColor: '#fff', fontSize: 15 },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterChip: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: '#fff' },
+  filterChipActive: { backgroundColor: '#0077CC', borderColor: '#0077CC' },
   filterText: { color: '#0077CC', fontWeight: 'bold', fontSize: 13 },
-  filterTextActive: { color: '#b8d8ee' },
+  filterTextActive: { color: '#fff' },
   loader: { marginTop: 28 },
-  grid: { height: 520, flexDirection: 'row', flexWrap: 'nowrap', gap: 16, overflow: 'hidden', paddingVertical: 2, paddingHorizontal: 6 },
-  card: { flexGrow: 0, flexBasis: 360, width: 360, minWidth: 360, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#dbe6ee', padding: 18, marginTop: 18, overflow: 'hidden', boxShadow: '0 18px 36px rgba(0, 119, 204, 0.42)' } as any,
+  grid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', gap: 16, padding: 6 },
+  card: { flexGrow: 1, flexShrink: 1, flexBasis: 310, minWidth: 0, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#dbe6ee', padding: 18, boxShadow: '0 3px 8px rgba(15, 23, 42, 0.08)' },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  date: { color: '#00A8A8', fontWeight: 'bold', fontSize: 13 },
+  date: { color: '#007f83', fontWeight: 'bold', fontSize: 13, flexShrink: 1 },
   chevron: { color: '#0077CC', fontSize: 25, lineHeight: 22 },
-  location: { color: '#1e293b', fontSize: 21, fontWeight: 'bold', marginTop: 12, width: 245 },
+  location: { color: '#1e293b', fontSize: 21, fontWeight: 'bold', marginTop: 12 },
   country: { color: '#637789', fontSize: 13, marginTop: 5 },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 17 },
   metric: { color: '#35596f', backgroundColor: '#f1f8fc', borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6, fontSize: 12, fontWeight: 'bold' },
-  cardFooter: { borderTopWidth: 1, borderTopColor: '#e7eef3', marginTop: 17, paddingTop: 12, flexDirection: 'row', flexWrap: 'nowrap', justifyContent: 'space-between', gap: 8, height: 32, overflow: 'hidden' },
+  cardFooter: { borderTopWidth: 1, borderTopColor: '#e7eef3', marginTop: 17, paddingTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
   condition: { color: '#008d8d', fontWeight: 'bold', fontSize: 13 },
   progress: { color: '#728396', fontSize: 12 },
   emptyCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 18, padding: 28, alignItems: 'center', marginBottom: 16 },

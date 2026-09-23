@@ -20,7 +20,10 @@ export default function DiveStatsScreen() {
     setLoading(true);
     setError(false);
     API.get<Dive[]>('/dives/my', { signal: controller.signal })
-      .then(response => { if (active) setDives(response.data); })
+      .then(response => {
+        if (!Array.isArray(response.data)) throw new Error('Unexpected statistics response');
+        if (active) setDives(response.data);
+      })
       .catch(() => { if (active) setError(true); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; controller.abort(); };

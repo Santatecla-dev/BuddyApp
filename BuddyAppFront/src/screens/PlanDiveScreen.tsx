@@ -1,7 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
-  Alert,
-  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -14,28 +12,13 @@ import { Picker } from '@react-native-picker/picker';
 import API from '../api/api';
 import { COUNTRIES } from './CreateDiveScreen';
 
-type ChecklistItem = {
-  id: string;
-  label: string;
-  group: string;
-};
-
-const CHECKLIST: ChecklistItem[] = [
-  { id: 'mask', label: 'Mask and spare mask', group: 'Personal gear' },
-  { id: 'fins', label: 'Fins and boots', group: 'Personal gear' },
-  { id: 'computer', label: 'Dive computer charged', group: 'Personal gear' },
-  { id: 'buoyancy', label: 'BCD inflator tested', group: 'Personal gear' },
-  { id: 'regulator', label: 'Regulator and alternate air source', group: 'Gas and equipment' },
-  { id: 'tank', label: 'Tank visual inspection complete', group: 'Gas and equipment' },
-  { id: 'weights', label: 'Weights and quick-release checked', group: 'Gas and equipment' },
-  { id: 'surface', label: 'Surface marker and whistle packed', group: 'Safety' },
-  { id: 'first-aid', label: 'First aid kit and emergency contacts', group: 'Safety' },
-];
+import { CHECKLIST, ChecklistItem } from '../utils/plannedDiveChecklist';
 
 const CONDITIONS = ['Calm', 'Good', 'Choppy', 'Low visibility'];
 const GAS_OPTIONS = ['Air', 'Nitrox 32', 'Nitrox 36', 'Trimix'];
 
 export default function PlanDiveScreen({ navigation }: any) {
+  const scrollRef = useRef<ScrollView>(null);
   const [country, setCountry] = useState('');
   const [site, setSite] = useState('');
   const [date, setDate] = useState('');
@@ -50,6 +33,7 @@ export default function PlanDiveScreen({ navigation }: any) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const completed = useMemo(() => CHECKLIST.filter((item) => checked[item.id]).length, [checked]);
   const groupedChecklist = useMemo(() => {
@@ -65,6 +49,7 @@ export default function PlanDiveScreen({ navigation }: any) {
   };
 
   const savePlan = async () => {
+    if (saving) return;
     setSaveError('');
     const dateMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(date.trim());
     const isoDateMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(date.trim());
@@ -74,16 +59,22 @@ export default function PlanDiveScreen({ navigation }: any) {
     const parsedDate = day && month && year
       ? new Date(year, month - 1, day, 12, 0, 0)
       : null;
-    if (!country || !site.trim() || (!dateMatch && !isoDateMatch) || !parsedDate || Number.isNaN(parsedDate.getTime())
+    const errors: Record<string, string> = {};
+    if (!country) errors.country = 'Select a country.';
+    if (!site.trim()) errors.site = 'Enter a dive site.';
+    if ((!dateMatch && !isoDateMatch) || !parsedDate || Number.isNaN(parsedDate.getTime())
       || parsedDate.getDate() !== day || parsedDate.getMonth() !== month - 1
       || parsedDate.getFullYear() !== year) {
-      setSaveError('Add a valid country, dive site and date (DD/MM/YYYY) before saving.');
-      return;
+      errors.date = 'Enter a real calendar date in DD/MM/YYYY format (for example, 25/09/2026).';
     }
     const maxDepth = Number(depth);
     const plannedDuration = Number(duration);
-    if (!Number.isFinite(maxDepth) || maxDepth < 1 || !Number.isInteger(plannedDuration) || plannedDuration < 1) {
-      setSaveError('Depth and duration must be valid positive numbers.');
+    if (!Number.isFinite(maxDepth) || maxDepth < 1 || maxDepth > 130) errors.depth = 'Enter a depth from 1 to 130 m.';
+    if (!Number.isInteger(plannedDuration) || plannedDuration < 1 || plannedDuration > 1440) errors.duration = 'Enter a whole-number duration from 1 to 1440 minutes.';
+    setFieldErrors(errors);
+    if (Object.keys(errors).length || !parsedDate) {
+      setSaveError('Please correct the highlighted fields before saving.');
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
       return;
     }
     setSaving(true);
@@ -99,15 +90,15 @@ export default function PlanDiveScreen({ navigation }: any) {
         gas,
         shoreEntry,
         notes: notes.trim() || undefined,
-        checklist: checked,
+        checklist: Object.fromEntries(CHECKLIST.map(item => [item.id, !!checked[item.id]])),
       });
       setSaved(true);
       navigation.navigate('PlannedDives');
     } catch (error: any) {
       const message = error?.response?.data?.message;
-      const readableMessage = Array.isArray(message) ? message[0] : message || 'Could not save this plan. Please try again.';
+      const readableMessage = Array.isArray(message) ? message.join(' ') : message || 'Could not save this plan. Please try again.';
       setSaveError(readableMessage);
-      Alert.alert('Could not save plan', readableMessage);
+
     } finally {
       setSaving(false);
     }
@@ -116,11 +107,12 @@ export default function PlanDiveScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
       <ScrollView
+        ref={scrollRef}
         style={styles.container}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.hero, Platform.OS === 'web' && styles.webHero]}>
+        <View style={styles.hero}>
           <View style={styles.heroCopy}>
             <Text style={styles.eyebrow}>PRE-DIVE PLANNER</Text>
             <Text style={styles.title}>Plan your next dive</Text>
@@ -132,11 +124,12 @@ export default function PlanDiveScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={[styles.formGrid, Platform.OS === 'web' && styles.webFormGrid]}>
-          <View style={styles.panel}>
+        {Object.keys(fieldErrors).length > 0 && <Text accessibilityRole="alert" style={styles.saveErrorText}>Please correct the fields marked below.</Text>}
+        <View style={styles.formGrid}>
+          <View style={[styles.panel, styles.formPanel]}>
             <Text style={styles.panelTitle}>Dive details</Text>
             <Text style={styles.label}>Country</Text>
-            <View style={styles.pickerWrap}>
+            <View style={[styles.pickerWrap, !!fieldErrors.country && styles.invalidInput]}>
               <Picker
                 accessibilityLabel="Planned dive country"
                 selectedValue={country}
@@ -147,14 +140,16 @@ export default function PlanDiveScreen({ navigation }: any) {
                 {COUNTRIES.map((option) => <Picker.Item key={option} label={option} value={option} />)}
               </Picker>
             </View>
+            {fieldErrors.country && <Text style={styles.saveErrorText}>{fieldErrors.country}</Text>}
             <Text style={styles.label}>Dive site</Text>
             <TextInput
               accessibilityLabel="Dive site"
               placeholder="Cala de la Mar"
               value={site}
               onChangeText={setSite}
-              style={styles.input}
+              style={[styles.input, !!fieldErrors.site && styles.invalidInput]}
             />
+            {fieldErrors.site && <Text style={styles.saveErrorText}>{fieldErrors.site}</Text>}
             <View style={styles.twoFields}>
               <View style={styles.fieldHalf}>
                 <Text style={styles.label}>Date</Text>
@@ -163,8 +158,9 @@ export default function PlanDiveScreen({ navigation }: any) {
                   placeholder="DD/MM/YYYY"
                   value={date}
                   onChangeText={setDate}
-                  style={styles.input}
+                  style={[styles.input, !!fieldErrors.date && styles.invalidInput]}
                 />
+                {fieldErrors.date && <Text style={styles.saveErrorText}>{fieldErrors.date}</Text>}
               </View>
               <View style={styles.fieldHalf}>
                 <Text style={styles.label}>Buddy</Text>
@@ -185,8 +181,9 @@ export default function PlanDiveScreen({ navigation }: any) {
                   keyboardType="number-pad"
                   value={depth}
                   onChangeText={setDepth}
-                  style={styles.input}
+                  style={[styles.input, !!fieldErrors.depth && styles.invalidInput]}
                 />
+                {fieldErrors.depth && <Text style={styles.saveErrorText}>{fieldErrors.depth}</Text>}
               </View>
               <View style={styles.fieldHalf}>
                 <Text style={styles.label}>Duration (min)</Text>
@@ -195,12 +192,13 @@ export default function PlanDiveScreen({ navigation }: any) {
                   keyboardType="number-pad"
                   value={duration}
                   onChangeText={setDuration}
-                  style={styles.input}
+                  style={[styles.input, !!fieldErrors.duration && styles.invalidInput]}
                 />
+                {fieldErrors.duration && <Text style={styles.saveErrorText}>{fieldErrors.duration}</Text>}
               </View>
             </View>
             <Text style={styles.label}>Expected conditions</Text>
-            <View style={[styles.conditionRow, Platform.OS === 'web' && styles.webConditionRow]}>
+            <View style={styles.conditionRow}>
               {CONDITIONS.map((option) => (
                 <TouchableOpacity
                   key={option}
@@ -215,10 +213,10 @@ export default function PlanDiveScreen({ navigation }: any) {
             </View>
           </View>
 
-          <View style={[styles.panel, Platform.OS === 'web' && styles.webEquipmentPanel]}>
+          <View style={[styles.panel, styles.formPanel]}>
             <Text style={styles.panelTitle}>Equipment setup</Text>
             <Text style={styles.label}>Gas mix</Text>
-            <View style={[styles.gasRow, Platform.OS === 'web' && styles.webGasRow]}>
+            <View style={styles.gasRow}>
               {GAS_OPTIONS.map((option) => (
                 <TouchableOpacity
                   key={option}
@@ -244,22 +242,22 @@ export default function PlanDiveScreen({ navigation }: any) {
                 thumbColor={shoreEntry ? '#00A8A8' : '#f8fafc'}
               />
             </View>
-            <View style={[styles.noticeRow, Platform.OS === 'web' && styles.webNoticeRow]}>
+            <View style={styles.noticeRow}>
               <Text style={styles.noticeIcon}>!</Text>
               <Text style={styles.noticeText}>Confirm the local tide, exit route and emergency contact before departure.</Text>
             </View>
           </View>
         </View>
 
-        <View style={[styles.panel, Platform.OS === 'web' && styles.webChecklistPanel]}>
+        <View style={styles.panel}>
           <View style={styles.checklistHeading}>
-            <View>
+            <View style={styles.checklistCopy}>
               <Text style={styles.panelTitle}>Equipment checklist</Text>
               <Text style={styles.panelSubtitle}>Mark each item before you leave the dock.</Text>
             </View>
             <Text style={styles.checklistCount}>{completed} of {CHECKLIST.length}</Text>
           </View>
-          <View style={[styles.checklistGroups, Platform.OS === 'web' && styles.webChecklistGroups]}>
+          <View style={styles.checklistGroups}>
             {Object.entries(groupedChecklist).map(([group, items]) => (
               <View key={group} style={styles.checklistGroup}>
                 <Text style={styles.groupLabel}>{group}</Text>
@@ -274,7 +272,7 @@ export default function PlanDiveScreen({ navigation }: any) {
                     <View style={[styles.checkbox, checked[item.id] && styles.checkboxActive]}>
                       {checked[item.id] ? <Text style={styles.checkmark}>✓</Text> : null}
                     </View>
-                    <Text style={styles.checkLabel} numberOfLines={1}>{item.label}</Text>
+                    <Text style={styles.checkLabel}>{item.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -282,7 +280,7 @@ export default function PlanDiveScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={[styles.panel, Platform.OS === 'web' && styles.webNotesPanel]}>
+        <View style={styles.panel}>
           <Text style={styles.panelTitle}>Plan notes</Text>
           <TextInput
             accessibilityLabel="Plan notes"
@@ -293,12 +291,12 @@ export default function PlanDiveScreen({ navigation }: any) {
             style={[styles.input, styles.notesInput]}
           />
         </View>
-      </ScrollView>
 
-      <View style={[styles.saveBar, Platform.OS === 'web' && styles.webSaveBar]}>
+
+      <View style={styles.saveBar}>
         <View style={styles.saveCopy}>
           <Text style={styles.saveTitle}>{saved ? 'Plan saved' : 'Ready to plan?'}</Text>
-          <Text style={saveError ? styles.saveErrorText : styles.saveHint}>{saveError || (saved ? 'Opening your planned dives.' : `${completed}/${CHECKLIST.length} equipment checks complete`)}</Text>
+          <Text accessibilityRole={saveError ? 'alert' : undefined} accessibilityLiveRegion="polite" style={saveError ? styles.saveErrorText : styles.saveHint}>{saveError || (saved ? 'Opening your planned dives.' : `${completed}/${CHECKLIST.length} equipment checks complete`)}</Text>
         </View>
         <TouchableOpacity accessibilityRole="button" disabled={saving} onPress={savePlan} style={[styles.saveButton, saving && styles.saveButtonDisabled]}>
           <Text style={styles.saveButtonText}>{saving ? 'Saving…' : saved ? 'Saved' : 'Save plan'}</Text>
@@ -307,6 +305,7 @@ export default function PlanDiveScreen({ navigation }: any) {
           <Text style={styles.logButtonText}>Log dive</Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
     </View>
   );
 }
@@ -315,35 +314,31 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f7f9fc', overflow: 'hidden' },
   container: { flex: 1 },
   content: { width: '100%', maxWidth: 1120, alignSelf: 'center', padding: 20, paddingBottom: 28 },
-  hero: { minWidth: 780, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e7f6fb', borderRadius: 22, padding: 24, marginBottom: 18, borderWidth: 1, borderColor: '#c5e9f3', overflow: 'hidden' },
-  webHero: { zIndex: 8, marginBottom: -8, boxShadow: '0 10px 24px rgba(0, 119, 204, 0.16)' } as any,
-  heroCopy: { flex: 1, paddingRight: 20 },
+  hero: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e7f6fb', borderRadius: 22, padding: 24, marginBottom: 18, borderWidth: 1, borderColor: '#c5e9f3' },
+  heroCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 300, minWidth: 0 },
   eyebrow: { color: '#00A8A8', fontSize: 11, fontWeight: 'bold', letterSpacing: 1.2, marginBottom: 7 },
   title: { color: '#0077CC', fontSize: 28, fontWeight: 'bold' },
   subtitle: { color: '#425466', fontSize: 15, marginTop: 7, lineHeight: 21 },
   progressBadge: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 5, borderColor: '#00A8A8' },
   progressValue: { color: '#0077CC', fontWeight: 'bold', fontSize: 22 },
   progressLabel: { color: '#587080', fontSize: 12, marginTop: 2 },
-  formGrid: { flexDirection: 'row', flexWrap: 'nowrap', gap: 18, marginBottom: 18 },
-  webFormGrid: { flexWrap: 'nowrap', width: 1040 },
-  panel: { flex: 1, minWidth: 460, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#dbe6ee', padding: 20, marginBottom: 18 },
-  webEquipmentPanel: { minWidth: 470, marginLeft: -28, zIndex: 2, boxShadow: '0 14px 24px rgba(0, 119, 204, 0.18)' } as any,
+  formGrid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 18 },
+  formPanel: { flexGrow: 1, flexShrink: 1, flexBasis: 440, minWidth: 0 },
+  panel: { backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#dbe6ee', padding: 20, marginBottom: 18 },
   panelTitle: { color: '#1e293b', fontSize: 19, fontWeight: 'bold', marginBottom: 5 },
   panelSubtitle: { color: '#6b7c8d', fontSize: 13, marginBottom: 16 },
   label: { color: '#334155', fontSize: 13, fontWeight: 'bold', marginTop: 14, marginBottom: 7 },
-  input: { width: '100%', minWidth: 0, minHeight: 48, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 13, paddingVertical: 11, color: '#fff', fontSize: 15 },
+  input: { width: '100%', minWidth: 0, minHeight: 48, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 13, paddingVertical: 11, color: '#334155', fontSize: 15 },
   pickerWrap: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', overflow: 'hidden' },
-  picker: { height: 48, color: '#fff' },
-  twoFields: { flexDirection: 'row', flexWrap: 'nowrap', gap: 12 },
-  fieldHalf: { flex: 1, minWidth: 210 },
-  conditionRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 8 },
-  webConditionRow: { width: 570, flexWrap: 'nowrap' },
-  chip: { minWidth: 112, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#fff' },
-  chipActive: { backgroundColor: '#e7f6fb', borderColor: '#b8d8ee' },
+  picker: { height: 48, width: '100%', color: '#334155', backgroundColor: '#fff' },
+  twoFields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  fieldHalf: { flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 0 },
+  conditionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#fff' },
+  chipActive: { backgroundColor: '#0077CC', borderColor: '#0077CC' },
   chipText: { color: '#0077CC', fontSize: 13, fontWeight: 'bold' },
-  chipTextActive: { color: '#b8d8ee' },
-  gasRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 8 },
-  webGasRow: { width: 540, flexWrap: 'nowrap' },
+  chipTextActive: { color: '#fff' },
+  gasRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   gasOption: { minWidth: 92, borderRadius: 13, borderWidth: 1, borderColor: '#c9e4f4', padding: 11, alignItems: 'center', backgroundColor: '#f7fbff' },
   gasOptionActive: { backgroundColor: '#e2f7f5', borderColor: '#00A8A8' },
   gasText: { color: '#3c5b70', fontSize: 13, fontWeight: 'bold' },
@@ -353,15 +348,14 @@ const styles = StyleSheet.create({
   toggleTitle: { color: '#334155', fontWeight: 'bold', fontSize: 15 },
   toggleHint: { color: '#728396', fontSize: 12, marginTop: 3 },
   noticeRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, backgroundColor: '#fff6dc', padding: 12, marginTop: 18, gap: 9 },
-  webNoticeRow: { width: 600, alignSelf: 'flex-start' },
   noticeIcon: { width: 22, height: 22, lineHeight: 22, textAlign: 'center', borderRadius: 11, backgroundColor: '#f4b942', color: '#fff', fontWeight: 'bold' },
   noticeText: { color: '#795d20', fontSize: 12, flex: 1, lineHeight: 17 },
-  checklistHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 },
+  checklistHeading: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  checklistCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 260, minWidth: 0 },
+  invalidInput: { borderColor: '#a43b3b', borderWidth: 2 },
   checklistCount: { color: '#00A8A8', fontWeight: 'bold', marginTop: 3 },
-  checklistGroups: { gap: 18 },
-  webChecklistPanel: { overflow: 'hidden', boxShadow: '0 12px 22px rgba(0, 0, 0, 0.2)' } as any,
-  webChecklistGroups: { width: 1010, flexDirection: 'row', flexWrap: 'nowrap', gap: 18 },
-  checklistGroup: { flex: 1, minWidth: 330 },
+  checklistGroups: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  checklistGroup: { flexGrow: 1, flexShrink: 1, flexBasis: 280, minWidth: 0 },
   groupLabel: { color: '#0077CC', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 9 },
   checkItem: { minHeight: 62, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fbfd', borderRadius: 14, borderWidth: 1, borderColor: '#e0edf4', paddingHorizontal: 12, paddingVertical: 10, marginBottom: 9 },
   checkItemActive: { backgroundColor: '#edfbf9', borderColor: '#91ddd5' },
@@ -369,11 +363,9 @@ const styles = StyleSheet.create({
   checkboxActive: { backgroundColor: '#00A8A8', borderColor: '#00A8A8' },
   checkmark: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
   checkLabel: { color: '#334155', flex: 1, fontSize: 13 },
-  notesInput: { minHeight: 100, width: 720, textAlignVertical: 'top' },
-  webNotesPanel: { marginTop: -12, zIndex: 1 },
-  saveBar: { flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#dbe6ee' },
-  webSaveBar: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 78, zIndex: 20, boxShadow: '0 -8px 18px rgba(15, 23, 42, 0.2)' } as any,
-  saveCopy: { flex: 1, minWidth: 330 },
+  notesInput: { minHeight: 120, textAlignVertical: 'top' },
+  saveBar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 18 },
+  saveCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 300, minWidth: 0 },
   saveTitle: { color: '#1e293b', fontWeight: 'bold', fontSize: 14 },
   saveHint: { color: '#728396', fontSize: 12, marginTop: 3 },
   saveErrorText: { color: '#a43b3b', fontSize: 12, marginTop: 3, fontWeight: 'bold' },
