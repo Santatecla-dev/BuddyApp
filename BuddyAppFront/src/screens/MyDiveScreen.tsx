@@ -316,6 +316,30 @@ export default function MyDivesScreen({ navigation, route }: any) {
         <Text style={styles.statsButtonText}>View dive statistics</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        accessibilityRole="button"
+        style={styles.planButton}
+        onPress={() => navigation.navigate('PlanDive')}
+      >
+        <Text style={styles.planButtonText}>Plan a new dive</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        accessibilityRole="button"
+        style={styles.mapButton}
+        onPress={() => navigation.navigate('DiveMap')}
+      >
+        <Text style={styles.mapButtonText}>Explore dive map</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        accessibilityRole="button"
+        style={styles.pokedexButton}
+        onPress={() => navigation.navigate('Pokedex')}
+      >
+        <Text style={styles.pokedexButtonText}>Open marine Pokedex</Text>
+      </TouchableOpacity>
+
 
         {loadError ? <View><Text accessibilityRole="alert" style={styles.statusText}>{loadError}</Text><TouchableOpacity accessibilityRole="button" style={styles.groupButton} onPress={fetchDives}><Text style={styles.groupButtonText}>Retry</Text></TouchableOpacity></View> : null}
       </>}
@@ -478,6 +502,54 @@ const styles = StyleSheet.create({
 
   statsButtonText: {
     color: '#00A8A8',
+    fontWeight: 'bold',
+  },
+
+  planButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#0077CC',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    backgroundColor: '#eaf6fc',
+  },
+
+  planButtonText: {
+    color: '#0077CC',
+    fontWeight: 'bold',
+  },
+
+  mapButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#b8d8ee',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    backgroundColor: '#fff',
+  },
+
+  mapButtonText: {
+    color: '#0077CC',
+    fontWeight: 'bold',
+  },
+
+  pokedexButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#00A8A8',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    backgroundColor: '#e8faf7',
+  },
+
+  pokedexButtonText: {
+    color: '#008d8d',
     fontWeight: 'bold',
   },
 

@@ -8,6 +8,7 @@ import {
   Get,
   Param,
   Patch,
+  Put,
 } from '@nestjs/common';
 import { DivesService } from './dives.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -17,6 +18,7 @@ import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { RejectInviteDto } from './dto/reject-invite.dto';
 import { ParseIntPipe } from '@nestjs/common';
 import { UpdatePersonalNotesDto } from './dto/update-personal-notes.dto';
+import { UpdateSightingsDto } from './dto/update-sightings.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('dives')
@@ -56,6 +58,20 @@ export class DivesController {
   getMyDives(@Req() req) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.divesService.getMyDives(req.user.userId);
+  }
+
+  @Get(':diveId/sightings')
+  getSightings(@Param('diveId', ParseIntPipe) diveId: number, @Req() req) {
+    return this.divesService.getDiveSightings(diveId, req.user.userId);
+  }
+
+  @Put(':diveId/sightings')
+  updateSightings(
+    @Param('diveId', ParseIntPipe) diveId: number,
+    @Body() dto: UpdateSightingsDto,
+    @Req() req,
+  ) {
+    return this.divesService.updateDiveSightings(diveId, dto.speciesKeys, req.user.userId);
   }
   @Get(':id/buddies')
   getDiveBuddies(@Param('id', ParseIntPipe) diveId: number) {

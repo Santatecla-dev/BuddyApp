@@ -7,7 +7,8 @@ import {
 } from 'typeorm';
 import { DiveBuddy } from './dive-buddy.entity';
 import { DiveInvite } from './dive-invite.entity';
-import { DiveCountry } from './dive-country.enum';
+import { DIVE_COUNTRY_VALUES } from './country.values';
+import { DiveSighting } from './dive-sighting.entity';
 
 @Entity()
 export class Dive {
@@ -19,9 +20,9 @@ export class Dive {
 
   @Column({
     type: 'enum',
-    enum: DiveCountry,
+    enum: DIVE_COUNTRY_VALUES,
   })
-  country: DiveCountry;
+  country: string;
   @Column()
   location: string;
 
@@ -42,4 +43,7 @@ export class Dive {
 
   @OneToMany(() => DiveInvite, (invite) => invite.dive)
   invites: DiveInvite[];
+
+  @OneToMany(() => DiveSighting, (sighting) => sighting.dive)
+  sightings: DiveSighting[];
 }

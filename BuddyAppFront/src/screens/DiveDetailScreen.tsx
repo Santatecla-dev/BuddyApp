@@ -9,12 +9,15 @@ import {
   Alert,
   Pressable,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import API from '../api/api';
-import { DiveBuddy, Dive } from '../types';
+import { DiveBuddy, Dive, PokedexSpecies } from '../types';
 
 export default function DiveDetailScreen({ route, navigation }: any) {
   const { diveId } = route.params;
+  const { width } = useWindowDimensions();
+  const compactLayout = width < 620;
 
   const [dive, setDive] = useState<Dive | null>(null);
   const [buddies, setBuddies] = useState<DiveBuddy[]>([]);
@@ -23,6 +26,9 @@ export default function DiveDetailScreen({ route, navigation }: any) {
   const [saved, setSaved] = useState(false);
   const [myUserId, setMyUserId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState('');
+  const [speciesCatalog, setSpeciesCatalog] = useState<PokedexSpecies[]>([]);
+  const [sightings, setSightings] = useState<string[]>([]);
+  const [savingSightings, setSavingSightings] = useState(false);
 
   const fetchDive = async () => {
     setLoadError('');
@@ -37,6 +43,9 @@ export default function DiveDetailScreen({ route, navigation }: any) {
 
       const buddiesRes = await API.get(`/dives/${diveId}/buddies`);
       setBuddies(buddiesRes.data);
+
+      const sightingsRes = await API.get(`/dives/${diveId}/sightings`);
+      setSightings(sightingsRes.data.map((item: PokedexSpecies) => item.key));
 
       try {
         const notesRes = await API.get(`/dives/${diveId}/personal-notes`);
@@ -67,6 +76,28 @@ export default function DiveDetailScreen({ route, navigation }: any) {
     fetchDive();
     extractMyUserId();
   }, [diveId]);
+
+  useEffect(() => {
+    API.get('/pokedex/species').then((response) => setSpeciesCatalog(response.data)).catch(() => setSpeciesCatalog([]));
+  }, []);
+
+  const toggleSighting = (speciesKey: string) => {
+    setSightings((current) => current.includes(speciesKey)
+      ? current.filter((key) => key !== speciesKey)
+      : [...current, speciesKey]);
+  };
+
+  const saveSightings = async () => {
+    try {
+      setSavingSightings(true);
+      await API.put(`/dives/${diveId}/sightings`, { speciesKeys: sightings });
+    } catch {
+      if (Platform.OS === 'web') window.alert('Could not save sightings');
+      else Alert.alert('Error', 'Could not save sightings');
+    } finally {
+      setSavingSightings(false);
+    }
+  };
 
   const saveMyNotes = async () => {
     try {
@@ -190,6 +221,35 @@ export default function DiveDetailScreen({ route, navigation }: any) {
         </TouchableOpacity>
       </View>
 
+      <View style={[styles.notesCard, styles.shadow, styles.sightingCard]}>
+        <View style={styles.sightingHeading}>
+          <View>
+            <Text style={styles.sectionTitle}>Marine life sighted</Text>
+            <Text style={styles.sightingHint}>One entry per species on this dive.</Text>
+          </View>
+          <Text style={styles.sightingCount}>{sightings.length}</Text>
+        </View>
+        <View style={[styles.sightingGrid, compactLayout && styles.compactSightingGrid]}>
+          {speciesCatalog.map((species) => {
+            const selected = sightings.includes(species.key);
+            return (
+              <TouchableOpacity
+                key={species.key}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: selected }}
+                onPress={() => toggleSighting(species.key)}
+                style={[styles.sightingOption, selected && styles.sightingOptionSelected]}
+              >
+                <Text numberOfLines={2} style={[styles.sightingName, selected && styles.sightingNameSelected]}>{species.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <TouchableOpacity accessibilityRole="button" disabled={savingSightings} style={styles.saveSightingsButton} onPress={saveSightings}>
+          <Text style={styles.saveButtonText}>{savingSightings ? 'Saving…' : 'Save sightings'}</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* BUDDIES */}
       <Text style={styles.sectionTitle}>Buddies</Text>
 
@@ -308,6 +368,18 @@ const styles = StyleSheet.create({
   },
 
   saveButtonText: { color: 'white', fontWeight: 'bold' },
+
+  sightingCard: { marginTop: 2 },
+  sightingHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  sightingHint: { color: '#718394', fontSize: 12, marginTop: -6, marginBottom: 12 },
+  sightingCount: { minWidth: 28, height: 28, borderRadius: 14, backgroundColor: '#0077CC', color: '#fff', textAlign: 'center', lineHeight: 28, fontWeight: 'bold' },
+  sightingGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  compactSightingGrid: { flexWrap: 'nowrap', width: 860, paddingRight: 28 },
+  sightingOption: { width: 132, minHeight: 46, borderRadius: 12, padding: 9, backgroundColor: '#f8fbfd', borderWidth: 1, borderColor: '#dbe8ef', justifyContent: 'center' },
+  sightingOptionSelected: { backgroundColor: '#e6faf6', borderColor: '#00A8A8', transform: [{ translateX: 12 }, { translateY: -7 }], marginLeft: -8, zIndex: 4 },
+  sightingName: { color: '#41596b', fontSize: 12, fontWeight: 'bold' },
+  sightingNameSelected: { color: '#008d8d' },
+  saveSightingsButton: { marginTop: 14, backgroundColor: '#00A8A8', padding: 12, borderRadius: 24, alignItems: 'center' },
 
   buddyCard: {
     backgroundColor: 'white',

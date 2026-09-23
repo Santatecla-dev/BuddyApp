@@ -3,18 +3,20 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsEnum,
   IsNotEmpty,
+  IsIn,
+  IsArray,
+  ArrayMaxSize,
 } from 'class-validator';
-import { DiveCountry } from 'src/dives/dive-country.enum';
+import { DIVE_COUNTRY_VALUES } from '../country.values';
 
 export class CreateDiveDto {
   @IsDateString({}, { message: 'La fecha no es válida' })
   date: string;
 
-  @IsEnum(DiveCountry, { message: 'El país no es válido' })
+  @IsIn(DIVE_COUNTRY_VALUES, { message: 'El país no es válido' })
   @IsNotEmpty({ message: 'El país es obligatorio' })
-  country: DiveCountry;
+  country: string;
 
   @IsString({ message: 'La localización debe ser un texto' })
   @IsNotEmpty({ message: 'La localización es obligatoria' })
@@ -29,4 +31,10 @@ export class CreateDiveDto {
   @IsOptional()
   @IsString({ message: 'Las notas deben ser un texto' })
   notes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  sightings?: string[];
 }

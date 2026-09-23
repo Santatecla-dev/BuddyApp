@@ -10,6 +10,9 @@ import InviteBuddyScreen from './src/screens/InviteBuddyScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import DiveStatsScreen from './src/screens/DiveStatsScreen';
+import PlanDiveScreen from './src/screens/PlanDiveScreen';
+import DiveMapScreen from './src/screens/DiveMapScreen';
+import PokedexScreen from './src/screens/PokedexScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -32,6 +35,9 @@ export default function App() {
         <Stack.Screen name="InviteBuddy" component={InviteBuddyScreen} options={{ title: 'Invite Buddy' }} />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
         <Stack.Screen name="DiveStats" component={DiveStatsScreen} options={{ title: 'Dive statistics' }} />
+        <Stack.Screen name="PlanDive" component={PlanDiveScreen} options={{ title: 'Plan a dive' }} />
+        <Stack.Screen name="DiveMap" component={DiveMapScreen} options={{ title: 'Dive map' }} />
+        <Stack.Screen name="Pokedex" component={PokedexScreen} options={{ title: 'Pokedex' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

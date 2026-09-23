@@ -27,3 +27,13 @@ export interface DiveInvite {
   invitedByUser: User;
   status: string;
 }
+
+export type PokedexCategory = 'Sharks' | 'Tropical fish' | 'Macro' | 'Crustaceans' | 'Rays' | 'Pelagic';
+
+export interface PokedexSpecies {
+  key: string;
+  name: string;
+  category: PokedexCategory;
+  imageUrl: string;
+  sightingsCount?: number;
+}

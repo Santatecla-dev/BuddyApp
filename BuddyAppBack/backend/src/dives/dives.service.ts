@@ -1,7 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Dive } from './dive.entity';
 import { DiveBuddy } from './dive-buddy.entity';
 import { CreateDiveDto } from './dto/create-dive.dto';
@@ -11,6 +11,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { DiveInvite, InviteStatus } from './dive-invite.entity';
+import { DiveSighting } from './dive-sighting.entity';
+import { AddSightingsToDivesDto } from './dto/update-sightings.dto';
+import { getSpecies, POKEDEX_SPECIES } from './pokedex.catalog';
 
 @Injectable()
 export class DivesService {
@@ -24,6 +27,9 @@ export class DivesService {
 
     @InjectRepository(DiveBuddy)
     private diveBuddyRepo: Repository<DiveBuddy>,
+
+    @InjectRepository(DiveSighting)
+    private diveSightingRepo: Repository<DiveSighting>,
   ) {}
 
   async createDive(dto: CreateDiveDto, creatorUserId: number) {
@@ -47,7 +53,80 @@ export class DivesService {
 
     await this.diveBuddyRepo.save(buddy);
 
+    if (dto.sightings?.length) {
+      await this.updateDiveSightings(savedDive.id, dto.sightings, creatorUserId);
+    }
+
     return savedDive;
+  }
+
+  getPokedexSpecies() {
+    return POKEDEX_SPECIES;
+  }
+
+  async getPokedex(userId: number) {
+    const memberships = await this.diveBuddyRepo.find({ where: { userId } });
+    const diveIds = memberships.map((membership) => membership.diveId);
+    const sightings = diveIds.length
+      ? await this.diveSightingRepo.find({ where: { diveId: In(diveIds) } })
+      : [];
+    const counts = new Map<string, Set<number>>();
+
+    sightings.forEach((sighting) => {
+      if (!counts.has(sighting.speciesKey)) counts.set(sighting.speciesKey, new Set<number>());
+      counts.get(sighting.speciesKey)?.add(sighting.diveId);
+    });
+
+    return POKEDEX_SPECIES.map((species) => ({
+      ...species,
+      sightingsCount: counts.get(species.key)?.size || 0,
+    }));
+  }
+
+  private async ensureDiveMember(diveId: number, userId: number) {
+    const membership = await this.diveBuddyRepo.findOne({ where: { diveId, userId } });
+    if (!membership) throw new ForbiddenException('No formas parte de esta inmersión');
+  }
+
+  async getDiveSightings(diveId: number, userId: number) {
+    await this.ensureDiveMember(diveId, userId);
+    const sightings = await this.diveSightingRepo.find({ where: { diveId }, order: { createdAt: 'ASC' } });
+    return sightings
+      .map((sighting) => getSpecies(sighting.speciesKey))
+      .filter((species): species is NonNullable<typeof species> => Boolean(species));
+  }
+
+  async updateDiveSightings(diveId: number, speciesKeys: string[], userId: number) {
+    await this.ensureDiveMember(diveId, userId);
+    const requested = [...new Set(speciesKeys)].filter((key) => Boolean(getSpecies(key)));
+    const existing = await this.diveSightingRepo.find({ where: { diveId } });
+    const keep = new Set(requested);
+    const remove = existing.filter((sighting) => !keep.has(sighting.speciesKey));
+    if (remove.length) await this.diveSightingRepo.remove(remove);
+
+    const existingKeys = new Set(existing.map((sighting) => sighting.speciesKey));
+    const additions = requested
+      .filter((key) => !existingKeys.has(key))
+      .map((speciesKey) => this.diveSightingRepo.create({ diveId, speciesKey, createdByUserId: userId }));
+    if (additions.length) await this.diveSightingRepo.save(additions);
+    return this.getDiveSightings(diveId, userId);
+  }
+
+  async addSightingToDives(dto: AddSightingsToDivesDto, userId: number) {
+    if (!getSpecies(dto.speciesKey)) throw new BadRequestException('Especie no válida');
+    const diveIds = [...new Set(dto.diveIds)];
+    if (!diveIds.length) throw new BadRequestException('Selecciona al menos una inmersión');
+
+    const addedTo: number[] = [];
+    for (const diveId of diveIds) {
+      await this.ensureDiveMember(diveId, userId);
+      const existing = await this.diveSightingRepo.findOne({ where: { diveId, speciesKey: dto.speciesKey } });
+      if (!existing) {
+        await this.diveSightingRepo.save(this.diveSightingRepo.create({ diveId, speciesKey: dto.speciesKey, createdByUserId: userId }));
+        addedTo.push(diveId);
+      }
+    }
+    return { speciesKey: dto.speciesKey, addedTo };
   }
 
   async inviteBuddy(

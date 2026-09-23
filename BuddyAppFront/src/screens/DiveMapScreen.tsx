@@ -14,77 +14,94 @@ import API from '../api/api';
 import { Dive } from '../types';
 
 type Marker = {
-  dive: Dive;
+  country: string;
+  dives: Dive[];
   left: number;
   top: number;
 };
 
-const COUNTRY_POINTS: Record<string, { left: number; top: number }> = {
-  spain: { left: 47, top: 34 },
-  espana: { left: 47, top: 34 },
-  portugal: { left: 45, top: 36 },
-  andorra: { left: 49, top: 32 },
-  afghanistan: { left: 65, top: 39 },
-  afganistan: { left: 65, top: 39 },
-  albania: { left: 54, top: 36 },
-  france: { left: 48, top: 30 },
-  francia: { left: 48, top: 30 },
-  italy: { left: 52, top: 37 },
-  italia: { left: 52, top: 37 },
-  germany: { left: 52, top: 29 },
-  alemania: { left: 52, top: 29 },
-  unitedkingdom: { left: 47, top: 25 },
-  reinounido: { left: 47, top: 25 },
-  norway: { left: 51, top: 17 },
-  greece: { left: 56, top: 39 },
-  turkey: { left: 59, top: 36 },
-  morocco: { left: 45, top: 43 },
-  egypt: { left: 56, top: 47 },
-  southafrica: { left: 53, top: 75 },
-  nigeria: { left: 46, top: 53 },
-  unitedstates: { left: 24, top: 34 },
-  estadosunidosdeamerica: { left: 24, top: 34 },
-  canada: { left: 25, top: 22 },
-  mexico: { left: 25, top: 47 },
-  brazil: { left: 34, top: 62 },
-  argentina: { left: 31, top: 77 },
-  colombia: { left: 28, top: 55 },
-  australia: { left: 79, top: 72 },
-  newzealand: { left: 89, top: 78 },
-  japan: { left: 84, top: 37 },
-  china: { left: 72, top: 37 },
-  india: { left: 65, top: 48 },
-  thailand: { left: 70, top: 53 },
-  indonesia: { left: 72, top: 63 },
-  philippines: { left: 77, top: 54 },
+type Coordinate = { latitude: number; longitude: number };
+
+const COUNTRY_COORDINATES: Record<string, Coordinate> = {
+  spain: { latitude: 39.5, longitude: -8.3 },
+  portugal: { latitude: 39.5, longitude: -8.0 },
+  andorra: { latitude: 42.5, longitude: 1.5 },
+  afghanistan: { latitude: 34.2, longitude: 61.8 },
+  albania: { latitude: 41.2, longitude: 20.2 },
+  france: { latitude: 46.2, longitude: 2.2 },
+  italy: { latitude: 42.8, longitude: 12.8 },
+  germany: { latitude: 51.2, longitude: 10.4 },
+  unitedkingdom: { latitude: 55.4, longitude: -3.4 },
+  norway: { latitude: 64.5, longitude: 11.0 },
+  greece: { latitude: 39.1, longitude: 22.9 },
+  turkey: { latitude: 39.0, longitude: 35.2 },
+  morocco: { latitude: 31.8, longitude: -7.1 },
+  egypt: { latitude: 26.8, longitude: 30.8 },
+  southafrica: { latitude: -30.6, longitude: 22.9 },
+  nigeria: { latitude: 9.1, longitude: 8.7 },
+  unitedstates: { latitude: 38.0, longitude: -97.0 },
+  canada: { latitude: 56.1, longitude: -106.3 },
+  mexico: { latitude: 23.6, longitude: -102.5 },
+  brazil: { latitude: -10.8, longitude: -52.9 },
+  argentina: { latitude: -34.0, longitude: -64.0 },
+  colombia: { latitude: 4.6, longitude: -74.1 },
+  australia: { latitude: -25.3, longitude: 133.8 },
+  newzealand: { latitude: -41.0, longitude: 174.0 },
+  japan: { latitude: 36.2, longitude: 138.3 },
+  china: { latitude: 35.9, longitude: 104.2 },
+  india: { latitude: 22.9, longitude: 79.9 },
+  pakistan: { latitude: 30.4, longitude: 69.3 },
+  thailand: { latitude: 15.9, longitude: 100.9 },
+  indonesia: { latitude: -2.5, longitude: 118.0 },
+  philippines: { latitude: 13.5, longitude: 117.0 },
+  russia: { latitude: 61.5, longitude: 105.3 },
+  peru: { latitude: -9.2, longitude: -75.0 },
+  chile: { latitude: -33.4, longitude: -70.7 },
+  ecuador: { latitude: -1.8, longitude: -78.2 },
+  vietnam: { latitude: 14.1, longitude: 108.3 },
+  malaysia: { latitude: 4.2, longitude: 101.9 },
+  singapore: { latitude: 1.35, longitude: 103.8 },
+  seychelles: { latitude: -4.7, longitude: 55.5 },
+  maldives: { latitude: 3.2, longitude: 73.2 },
+  madagascar: { latitude: -18.8, longitude: 46.9 },
+  mauritius: { latitude: -20.3, longitude: 57.6 },
+  fiji: { latitude: -17.7, longitude: 178.1 },
+  palau: { latitude: 7.5, longitude: 134.6 },
+  papuanewguinea: { latitude: -6.3, longitude: 147.0 },
+};
+
+const COUNTRY_ALIASES: Record<string, string> = {
+  espana: 'spain', francia: 'france', italia: 'italy', alemania: 'germany',
+  reinounido: 'unitedkingdom', afganistan: 'afghanistan', grecia: 'greece',
+  turquia: 'turkey', marruecos: 'morocco', egipto: 'egypt', sudafrica: 'southafrica',
+  estadosunidosdeamerica: 'unitedstates', brasil: 'brazil', argentina: 'argentina',
+  colombia: 'colombia', australia: 'australia', nuevazelanda: 'newzealand',
+  japon: 'japan', india: 'india', pakistan: 'pakistan', tailandia: 'thailand',
+  indonesia: 'indonesia', filipinas: 'philippines', rusia: 'russia', peru: 'peru',
+  chile: 'chile', ecuador: 'ecuador', vietnam: 'vietnam', malasia: 'malaysia',
+  singapur: 'singapore', seychelles: 'seychelles', maldivas: 'maldives',
+  madagascar: 'madagascar', mauricio: 'mauritius', fiyi: 'fiji', papuanuevaguinea: 'papuanewguinea',
 };
 
 const countryKey = (value: string) =>
   value.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '');
 
-const WORLD_MAP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480">
-<g fill="none" stroke="#ffffff" stroke-width="1" opacity=".2">
-<path d="M0 120H900M0 240H900M0 360H900M180 0V480M360 0V480M540 0V480M720 0V480"/>
-</g>
-<g fill="#a8d0a8" stroke="#689b78" stroke-width="2" stroke-linejoin="round">
-<path d="M48 108C68 84 96 72 128 67C162 60 195 67 224 80C249 91 270 108 294 117L279 143C260 153 244 161 228 174L205 169L184 182L158 198L126 187L102 168L74 155L54 133Z"/>
-<path d="M202 54C220 39 247 30 269 36L280 55L263 69L238 67Z"/>
-<path d="M301 238C322 225 350 230 367 249L382 277L371 315L355 352L345 395L324 433L304 410L298 376L283 340L278 302L290 272Z"/>
-<path d="M414 112L432 92L466 82L497 89L516 105L540 108L553 123L537 139L510 139L494 153L468 148L444 156L421 148Z"/>
-<path d="M531 83C562 70 606 62 647 67L695 65L744 79L779 101L811 136L837 178L804 192L778 207L770 247L736 232L701 220L675 232L650 212L621 211L601 194L571 178L547 157L526 143L552 122L563 104Z"/>
-<path d="M451 171L482 161L515 171L545 198L559 238L543 277L527 314L506 352L482 390L455 365L438 329L427 292L414 254L420 218Z"/>
-<path d="M678 349L710 334L750 340L786 359L813 380L789 401L752 414L713 411L683 397L665 375Z"/>
-<path d="M824 218L838 210L851 218L847 231L833 237L822 230Z"/>
-<path d="M785 270L798 264L808 273L801 284L787 283Z"/>
-</g>
-<g fill="#8fbd96" opacity=".75" font-family="Arial, sans-serif" font-size="12" font-weight="600" text-anchor="middle">
-<text x="170" y="132">North America</text><text x="329" y="316">South America</text><text x="467" y="126">Europe</text><text x="485" y="267">Africa</text><text x="682" y="143">Asia</text><text x="741" y="380">Oceania</text>
-</g></svg>`;
+const pointForCountry = (country: string) => {
+  const key = countryKey(country);
+  const coordinate = COUNTRY_COORDINATES[COUNTRY_ALIASES[key] || key];
+  if (!coordinate) return null;
+  return {
+    left: ((coordinate.longitude + 180) / 360) * 100,
+    top: ((90 - coordinate.latitude) / 180) * 100,
+  };
+};
+
+const WORLD_MAP_URI = 'https://upload.wikimedia.org/wikipedia/commons/9/9f/BlankMap-World-Equirectangular.svg';
 
 export default function DiveMapScreen({ navigation }: any) {
   const [dives, setDives] = useState<Dive[]>([]);
   const [query, setQuery] = useState('');
-  const [selectedDive, setSelectedDive] = useState<Dive | null>(null);
+  const [selectedMarker, setSelectedMarker] = useState<Marker | null>(null);
   const [zoom, setZoom] = useState(1);
   const [loading, setLoading] = useState(true);
 
@@ -103,16 +120,14 @@ export default function DiveMapScreen({ navigation }: any) {
     );
   }, [dives, query]);
 
-  const markers: Marker[] = filteredDives.map((dive, index) => {
-    const point = COUNTRY_POINTS[countryKey(dive.country)] || {
-      left: 20 + ((index * 29) % 65),
-      top: 25 + ((index * 37) % 50),
-    };
-    return {
-      dive,
-      left: point.left + (index % 3 - 1) * 1.4,
-      top: point.top + (index % 2 ? 1.2 : -1.2),
-    };
+  const groupedDives = filteredDives.reduce<Record<string, Dive[]>>((groups, dive) => {
+    groups[dive.country] = [...(groups[dive.country] || []), dive];
+    return groups;
+  }, {});
+  const unplacedCountries = Object.keys(groupedDives).filter((country) => !pointForCountry(country));
+  const markers: Marker[] = Object.entries(groupedDives).flatMap(([country, countryDives]) => {
+    const point = pointForCountry(country);
+    return point ? [{ country, dives: countryDives, left: point.left, top: point.top }] : [];
   });
 
   return (
@@ -154,10 +169,10 @@ export default function DiveMapScreen({ navigation }: any) {
         ) : (
           <View style={[styles.mapCanvas, Platform.OS === 'web' && styles.webMapCanvas, { transform: [{ scale: zoom }] }]}>
             <Image
-              source={{ uri: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(WORLD_MAP_SVG)}` }}
+              source={{ uri: WORLD_MAP_URI }}
               style={styles.worldMapImage}
               resizeMode="stretch"
-              accessibilityLabel="Stylized world map"
+              accessibilityLabel="Public domain world map"
             />
             <View style={styles.zoomControls}>
               <TouchableOpacity style={styles.zoomButton} onPress={() => setZoom((value) => Math.min(2, value + 0.25))}>
@@ -169,34 +184,41 @@ export default function DiveMapScreen({ navigation }: any) {
             </View>
             <View style={styles.legend}>
               <Text style={styles.legendTitle}>Legend</Text>
-              <Text style={styles.legendItem}>● My dive sites</Text>
-              <Text style={styles.legendItem}>○ Shared sites</Text>
+              <Text style={styles.legendItem}>● Countries visited</Text>
+              <Text style={styles.legendItem}>Number = dives</Text>
             </View>
 
             {markers.map((marker) => (
               <TouchableOpacity
-                key={marker.dive.id}
+                key={marker.country}
                 accessibilityRole="button"
-                accessibilityLabel={`Open ${marker.dive.location}`}
-                style={[styles.marker, { left: `${marker.left}%`, top: `${marker.top}%` }, marker.dive.id === selectedDive?.id && styles.selectedMarker]}
-                onPress={() => setSelectedDive(marker.dive)}
+                accessibilityLabel={`Open dives in ${marker.country}`}
+                style={[styles.marker, { left: `calc(${marker.left}% - 17px)`, top: `calc(${marker.top}% - 17px)` } as any, marker.country === selectedMarker?.country && styles.selectedMarker]}
+                onPress={() => setSelectedMarker(marker)}
               >
-                <Text style={styles.markerText}>●</Text>
+                <Text style={styles.markerText}>{marker.dives.length}</Text>
               </TouchableOpacity>
             ))}
 
-            {selectedDive && (
+            {selectedMarker && (
               <View style={[styles.popup, Platform.OS === 'web' && styles.webPopup]}>
-                <Text style={styles.popupTitle}>{selectedDive.location}</Text>
-                <Text style={styles.popupText}>{selectedDive.country}</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('DiveDetail', { diveId: selectedDive.id })}>
-                  <Text style={styles.popupLink}>View dive details</Text>
+                <Text style={styles.popupTitle}>{selectedMarker.country}</Text>
+                <Text style={styles.popupText}>{selectedMarker.dives.length} logged dive{selectedMarker.dives.length === 1 ? '' : 's'}</Text>
+                {selectedMarker.dives.slice(0, 2).map((dive) => (
+                  <Text key={dive.id} style={styles.popupDive} numberOfLines={1}>{dive.location}</Text>
+                ))}
+                <TouchableOpacity onPress={() => navigation.navigate('DiveDetail', { diveId: selectedMarker.dives[0].id })}>
+                  <Text style={styles.popupLink}>View latest dive</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
         )}
       </View>
+      <Text style={styles.mapCredit}>Base map: Wikimedia Commons, CC0 / public domain</Text>
+      {unplacedCountries.length > 0 && (
+        <Text style={styles.unplacedText}>No map position for: {unplacedCountries.join(', ')}</Text>
+      )}
 
       {!loading && filteredDives.length === 0 && (
         <Text style={styles.emptyText}>No dive sites match your search.</Text>
@@ -220,10 +242,10 @@ const styles = StyleSheet.create({
   filterActiveText: { color: 'white', fontWeight: 'bold' },
   filterButton: { backgroundColor: 'white', borderColor: '#b8d8ee', borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
   filterText: { color: '#0077CC', fontWeight: 'bold' },
-  mapViewport: { height: 480, width: '100%', borderRadius: 20, backgroundColor: '#d7edf5' },
+  mapViewport: { width: '100%', aspectRatio: 1.97, borderRadius: 20, backgroundColor: '#d7edf5' },
   webMapViewport: { overflow: 'hidden' },
   mapCanvas: { flex: 1, position: 'relative', overflow: 'hidden', borderRadius: 20, backgroundColor: '#c7e7ee' },
-  webMapCanvas: { width: 900 },
+  webMapCanvas: { width: '100%' },
   worldMapImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   zoomControls: { position: 'absolute', left: 14, top: 14, zIndex: 5, gap: 6 },
   zoomButton: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
@@ -233,12 +255,15 @@ const styles = StyleSheet.create({
   legendItem: { color: '#555', fontSize: 12, marginTop: 3 },
   marker: { position: 'absolute', width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0077CC', borderWidth: 3, borderColor: 'white', zIndex: 3 },
   selectedMarker: { backgroundColor: '#00A8A8', transform: [{ scale: 1.25 }] },
-  markerText: { color: 'white', fontSize: 20, lineHeight: 20 },
+  markerText: { color: 'white', fontSize: 13, lineHeight: 16, fontWeight: 'bold' },
   popup: { position: 'absolute', left: '50%', bottom: 16, transform: [{ translateX: -120 }], width: 240, padding: 14, borderRadius: 14, backgroundColor: 'white', zIndex: 8 },
   webPopup: { bottom: -18 },
   popupTitle: { color: '#0077CC', fontSize: 16, fontWeight: 'bold' },
   popupText: { color: '#555', marginTop: 4 },
+  popupDive: { color: '#4f6474', fontSize: 12, marginTop: 6 },
   popupLink: { color: '#00A8A8', fontWeight: 'bold', marginTop: 10 },
+  mapCredit: { color: '#738494', fontSize: 11, marginTop: 7, textAlign: 'right' },
+  unplacedText: { color: '#8b5e34', fontSize: 12, marginTop: 8, textAlign: 'right' },
   loader: { flex: 1 },
   emptyText: { textAlign: 'center', color: '#777', marginTop: 24 },
 });
