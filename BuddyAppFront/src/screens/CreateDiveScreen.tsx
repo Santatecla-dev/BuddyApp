@@ -151,21 +151,22 @@ export default function CreateDiveScreen({ navigation }: any) {
         <Text style={styles.label}>Duration (minutes)</Text>
         <TextInput accessibilityLabel="Duration in minutes" placeholder="45" value={duration} onChangeText={setDuration} style={styles.input} keyboardType="number-pad" />
         {error('duration')}
-        <View style={[styles.sightingSection, compact && styles.compactSightingSection]}>
+        <View style={styles.sightingSection}>
           <View style={styles.sightingHeader}>
-            <View>
+            <View style={styles.sightingHeaderCopy}>
               <Text style={styles.label}>Marine life sighted (optional)</Text>
               <Text style={styles.sightingHint}>Select each species you saw on this dive.</Text>
             </View>
             <Text style={styles.sightingCount}>{sightings.length}</Text>
           </View>
-          <View style={[styles.sightingGrid, compact && styles.compactSightingGrid]}>
+          <View style={styles.sightingGrid}>
             {speciesCatalog.map((species) => {
               const selected = sightings.includes(species.key);
               return (
                 <TouchableOpacity
                   key={species.key}
                   accessibilityRole="checkbox"
+                  accessibilityLabel={species.name}
                   accessibilityState={{ checked: selected }}
                   onPress={() => toggleSighting(species.key)}
                   style={[styles.sightingOption, selected && styles.sightingOptionSelected]}
@@ -201,14 +202,13 @@ const styles = StyleSheet.create({
   compactField: { flexBasis: '40%' },
   notes: { minHeight: 104, textAlignVertical: 'top' },
   sightingSection: { marginTop: 12, padding: 14, borderRadius: 18, backgroundColor: '#eef8fc', borderWidth: 1, borderColor: '#c8e6f2' },
-  compactSightingSection: { minWidth: 470, marginLeft: -18 },
+  sightingHeaderCopy: { flex: 1, minWidth: 0, paddingRight: 8 },
   sightingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   sightingHint: { color: '#607789', fontSize: 12, marginTop: -4, marginBottom: 12 },
   sightingCount: { minWidth: 28, height: 28, borderRadius: 14, backgroundColor: '#0077CC', color: '#fff', textAlign: 'center', lineHeight: 28, fontWeight: 'bold' },
   sightingGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  compactSightingGrid: { flexWrap: 'nowrap', width: 760, paddingRight: 26 },
-  sightingOption: { width: 112, minHeight: 120, borderRadius: 13, padding: 7, backgroundColor: '#fff', borderWidth: 1, borderColor: '#d5e7ef' },
-  sightingOptionSelected: { borderColor: '#00A8A8', backgroundColor: '#e4f8f5', transform: [{ scale: 1.09 }, { translateY: -5 }], zIndex: 3, marginRight: -5 },
+  sightingOption: { width: 112, maxWidth: '100%', minHeight: 120, borderRadius: 13, padding: 7, backgroundColor: '#fff', borderWidth: 1, borderColor: '#d5e7ef' },
+  sightingOptionSelected: { borderColor: '#00A8A8', backgroundColor: '#e4f8f5' },
   sightingImage: { width: '100%', height: 70, borderRadius: 9, backgroundColor: '#dcebf1' },
   sightingName: { color: '#425466', fontSize: 11, fontWeight: 'bold', marginTop: 6 },
   sightingNameSelected: { color: '#008d8d' },
