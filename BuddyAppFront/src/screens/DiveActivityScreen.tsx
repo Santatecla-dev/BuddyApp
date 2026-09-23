@@ -11,6 +11,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import API from '../api/api';
 import { Dive, DiveTrip, PlannedDive } from '../types';
+import { diveDate } from '../utils/diveStats';
 
 type ActivityKind = 'logged' | 'planned';
 type ActivityFilter = 'all' | ActivityKind;
@@ -43,12 +44,12 @@ const dateKeyFromDate = (date: Date) => {
 };
 
 const dateKey = (value: string) => {
-  const date = new Date(value);
+  const date = diveDate(value);
   return Number.isNaN(date.getTime()) ? value.slice(0, 10) : dateKeyFromDate(date);
 };
 
 const formatDate = (value: string) => {
-  const date = new Date(value);
+  const date = diveDate(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, {
     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
   });
@@ -57,7 +58,7 @@ const formatDate = (value: string) => {
 const monthTitle = (value: Date) => value.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
 const sameMonth = (value: string, month: Date) => {
-  const date = new Date(value);
+  const date = diveDate(value);
   return date.getFullYear() === month.getFullYear() && date.getMonth() === month.getMonth();
 };
 
@@ -119,7 +120,7 @@ export default function DiveActivityScreen({ navigation }: any) {
 
   const tripNames = useMemo(() => {
     const names = new Map<number, string>();
-    trips.forEach((trip) => trip.plannedDives.forEach((plan) => names.set(plan.id, trip.name)));
+    trips.forEach((trip) => (trip.plannedDives || []).forEach((plan) => names.set(plan.id, trip.name)));
     return names;
   }, [trips]);
 
@@ -156,9 +157,9 @@ export default function DiveActivityScreen({ navigation }: any) {
   const visibleActivities = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
     return activities
-      .filter((item) => filter === 'all' || (filter === 'planned' ? item.kind !== 'planned' : item.kind === filter))
+      .filter((item) => filter === 'all' || item.kind === filter)
       .filter((item) => !normalized || `${item.location} ${item.country} ${item.buddy || ''} ${item.tripName || ''}`.toLocaleLowerCase().includes(normalized))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => diveDate(a.date).getTime() - diveDate(b.date).getTime());
   }, [activities, filter, query]);
 
   const monthActivities = useMemo(() => visibleActivities.filter((item) => sameMonth(item.date, month)), [month, visibleActivities]);
@@ -217,42 +218,64 @@ export default function DiveActivityScreen({ navigation }: any) {
             <View style={styles.summaryCard}><Text style={styles.summaryValue}>{Math.round(totalMinutes / 60)}h</Text><Text style={styles.summaryLabel}>Underwater time</Text></View>
           </View>
 
-          {mode === 'calendar' ? <View style={styles.calendarCard}>
-            <View style={styles.calendarToolbar}>
-              <TouchableOpacity accessibilityLabel="Previous month" accessibilityRole="button" style={styles.monthButton} onPress={() => moveMonth(-1)}><Text style={styles.monthButtonText}>‹</Text></TouchableOpacity>
-              <Text accessibilityRole="header" style={styles.monthTitle}>{monthTitle(month)}</Text>
-              <View style={styles.monthActions}><TouchableOpacity accessibilityRole="button" style={styles.todayButton} onPress={() => setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}><Text style={styles.todayText}>Today</Text></TouchableOpacity><TouchableOpacity accessibilityLabel="Next month" accessibilityRole="button" style={styles.monthButton} onPress={() => moveMonth(1)}><Text style={styles.monthButtonText}>›</Text></TouchableOpacity></View>
-            </View>
-            <View style={styles.weekdayRow}>{weekdayLabels.map((day) => <Text key={day} style={styles.weekday}>{day}</Text>)}</View>
-            {weeks.map((week, weekIndex) => <View key={`week-${weekIndex}`} style={styles.calendarWeek}>
-              {week.map(({ date, inMonth }) => {
-                const key = dateKeyFromDate(date);
-                const dayItems = byDate[key] || [];
-                return <TouchableOpacity key={key} accessibilityRole="button" accessibilityLabel={`Show activity for ${date.toLocaleDateString()}`} onPress={() => setSelectedDay({ key, date })} style={[styles.dayCell, !inMonth && styles.dayCellMuted]}>
-                  <Text style={[styles.dayNumber, !inMonth && styles.dayNumberMuted]}>{date.getDate()}</Text>
-                  {dayItems.slice(0, 2).map((item) => <TouchableOpacity key={item.key} accessibilityRole="button" onPress={() => openActivity(item)} style={[styles.activityPill, item.kind === 'planned' ? styles.plannedPill : styles.loggedPill]}><Text numberOfLines={1} style={styles.activityPillText}>{item.location}</Text></TouchableOpacity>)}
-                  {dayItems.length > 2 ? <Text style={styles.moreText}>+{dayItems.length - 2} more</Text> : null}
-                </TouchableOpacity>;
-              })}
-            </View>)}
-            {selectedDay ? <View style={styles.dayDetailCard}>
-              <View style={styles.dayDetailHeader}><View><Text style={styles.detailEyebrow}>Selected day</Text><Text style={styles.dayDetailTitle}>{selectedDay.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</Text></View><TouchableOpacity accessibilityLabel="Close selected day" onPress={() => setSelectedDay((current) => current)}><Text style={styles.closeText}>×</Text></TouchableOpacity></View>
-              {selectedDayItems.length ? <View style={styles.dayDetailList}>{selectedDayItems.map((item) => <TouchableOpacity key={item.key} accessibilityRole="button" style={[styles.dayActivityRow, item.kind === 'planned' && styles.dayActivityRowPlanned]} onPress={() => openActivity(item)}><View style={styles.dayActivityCopy}><Text style={styles.dayActivityLocation} numberOfLines={1}>{item.location}</Text><Text style={styles.dayActivityMeta}>{item.country} · {item.maxDepth}m · {item.duration} min</Text><Text style={styles.dayActivityStatus}>{item.kind === 'planned' ? `Planned${item.buddy ? ` with ${item.buddy}` : ''}` : 'Logged dive'}</Text></View><Text style={styles.dayActivityArrow}>›</Text></TouchableOpacity>)}</View> : <View style={styles.noDayActivity}><Text style={styles.noDayTitle}>Nothing planned for this day</Text><Text style={styles.noDayText}>There are no logged or planned dives matching the current filters.</Text><TouchableOpacity style={styles.noDayButton} onPress={() => navigation.navigate('PlanDive')}><Text style={styles.noDayButtonText}>Plan a dive</Text></TouchableOpacity></View>}
-            </View> : null}
-            <View style={styles.legend}><View style={styles.legendItem}><View style={[styles.legendDot, styles.loggedDot]} /><Text style={styles.legendText}>Logged</Text></View><View style={styles.legendItem}><View style={[styles.legendDot, styles.plannedDot]} /><Text style={styles.legendText}>Planned</Text></View></View>
-          </View> : <View style={styles.list}>
-            {visibleActivities.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Nothing matches these filters</Text><Text style={styles.emptyText}>Try another search or switch the activity type.</Text></View> : visibleActivities.map((item) => <TouchableOpacity key={item.key} accessibilityRole="button" style={[styles.listCard, item.kind === 'planned' && styles.listCardPlanned]} onPress={() => openActivity(item)}>
-              <View style={styles.listDate}><Text style={styles.listDateDay}>{new Date(item.date).getDate()}</Text><Text style={styles.listDateMonth}>{new Date(item.date).toLocaleDateString(undefined, { month: 'short' })}</Text></View>
-              <View style={styles.listMain}><View style={styles.listTitleRow}><Text style={styles.listLocation} numberOfLines={1}>{item.location}</Text><Text style={item.kind === 'planned' ? styles.plannedLabel : styles.loggedLabel}>{item.kind === 'planned' ? 'PLANNED' : 'LOGGED'}</Text></View><Text style={styles.listCountry}>{item.country} · {formatDate(item.date)}</Text><Text style={styles.listMeta}>{item.maxDepth}m max · {item.duration} min{item.buddy ? ` · ${item.buddy}` : ''}{item.tripName ? ` · ${item.tripName}` : ''}</Text></View>
-              <Text style={styles.listChevron}>›</Text>
-            </TouchableOpacity>)}
+            {mode === 'calendar' ? <View style={styles.calendarCard}>
+              <View style={styles.calendarToolbar}>
+                <TouchableOpacity accessibilityLabel="Previous month" accessibilityRole="button" style={styles.monthButton} onPress={() => moveMonth(-1)}><Text style={styles.monthButtonText}>‹</Text></TouchableOpacity>
+                <Text accessibilityRole="header" style={styles.monthTitle}>{monthTitle(month)}</Text>
+                <View style={styles.monthActions}><TouchableOpacity accessibilityRole="button" style={styles.todayButton} onPress={() => setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}><Text style={styles.todayText}>Today</Text></TouchableOpacity><TouchableOpacity accessibilityLabel="Next month" accessibilityRole="button" style={styles.monthButton} onPress={() => moveMonth(1)}><Text style={styles.monthButtonText}>›</Text></TouchableOpacity></View>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.calendarScrollContent}>
+                <View style={styles.calendarGridContainer}>
+                  <View style={styles.weekdayRow}>{weekdayLabels.map((day) => <Text key={day} style={styles.weekday}>{day}</Text>)}</View>
+                  {weeks.map((week, weekIndex) => <View key={`week-${weekIndex}`} style={styles.calendarWeek}>
+                    {week.map(({ date, inMonth }) => {
+                      const key = dateKeyFromDate(date);
+                      const dayItems = byDate[key] || [];
+                      const isSelected = selectedDay?.key === key;
+                      return <TouchableOpacity key={key} accessibilityRole="button" accessibilityLabel={`Show activity for ${date.toLocaleDateString()}`} onPress={() => setSelectedDay({ key, date })} style={[styles.dayCell, !inMonth && styles.dayCellMuted, isSelected && styles.dayCellSelected]}>
+                        <Text style={[styles.dayNumber, !inMonth && styles.dayNumberMuted, isSelected && styles.dayNumberSelected]}>{date.getDate()}</Text>
+                        <View style={styles.pillsContainer}>
+                          {dayItems.slice(0, 2).map((item) => <TouchableOpacity key={item.key} accessibilityRole="button" onPress={() => openActivity(item)} style={[styles.activityPill, item.kind === 'planned' ? styles.plannedPill : styles.loggedPill]}><Text numberOfLines={1} style={styles.activityPillText}>{item.location}</Text></TouchableOpacity>)}
+                          {dayItems.length > 2 ? <Text style={styles.moreText}>+{dayItems.length - 2} more</Text> : null}
+                        </View>
+                      </TouchableOpacity>;
+                    })}
+                  </View>)}
+                </View>
+              </ScrollView>
+              <View style={styles.legend}><View style={styles.legendItem}><View style={[styles.legendDot, styles.loggedDot]} /><Text style={styles.legendText}>Logged</Text></View><View style={styles.legendItem}><View style={[styles.legendDot, styles.plannedDot]} /><Text style={styles.legendText}>Planned</Text></View></View>
+              {selectedDay ? <View style={styles.dayDetailCard}>
+                <View style={styles.dayDetailHeader}><View style={styles.dayDetailHeaderCopy}><Text style={styles.detailEyebrow}>Selected day</Text><Text style={styles.dayDetailTitle}>{selectedDay.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</Text></View><TouchableOpacity accessibilityRole="button" accessibilityLabel="Close selected day" onPress={() => setSelectedDay(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.closeButton}><Text style={styles.closeText}>×</Text></TouchableOpacity></View>
+                {selectedDayItems.length ? <View style={styles.dayDetailList}>{selectedDayItems.map((item) => <TouchableOpacity key={item.key} accessibilityRole="button" style={[styles.dayActivityRow, item.kind === 'planned' && styles.dayActivityRowPlanned]} onPress={() => openActivity(item)}><View style={styles.dayActivityCopy}><Text style={styles.dayActivityLocation} numberOfLines={1}>{item.location}</Text><Text style={styles.dayActivityMeta}>{item.country} · {item.maxDepth}m · {item.duration} min</Text><Text style={styles.dayActivityStatus}>{item.kind === 'planned' ? `Planned${item.buddy ? ` with ${item.buddy}` : ''}` : 'Logged dive'}</Text></View><Text style={styles.dayActivityArrow}>›</Text></TouchableOpacity>)}</View> : <View style={styles.noDayActivity}><Text style={styles.noDayTitle}>Nothing planned for this day</Text><Text style={styles.noDayText}>There are no logged or planned dives matching the current filters.</Text><TouchableOpacity accessibilityRole="button" style={styles.noDayButton} onPress={() => navigation.navigate('PlanDive')}><Text style={styles.noDayButtonText}>Plan a dive</Text></TouchableOpacity></View>}
+              </View> : null}
+            </View> : <View style={styles.list}>
+            {visibleActivities.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Nothing matches these filters</Text><Text style={styles.emptyText}>Try another search or switch the activity type.</Text></View> : visibleActivities.map((item) => {
+              const itemDate = diveDate(item.date);
+              return (
+                <TouchableOpacity key={item.key} accessibilityRole="button" style={[styles.listCard, item.kind === 'planned' && styles.listCardPlanned]} onPress={() => openActivity(item)}>
+                  <View style={styles.listDate}>
+                    <Text style={styles.listDateDay}>{Number.isNaN(itemDate.getTime()) ? '-' : itemDate.getDate()}</Text>
+                    <Text style={styles.listDateMonth}>{Number.isNaN(itemDate.getTime()) ? '' : itemDate.toLocaleDateString(undefined, { month: 'short' })}</Text>
+                  </View>
+                  <View style={styles.listMain}>
+                    <View style={styles.listTitleRow}>
+                      <Text style={styles.listLocation} numberOfLines={1}>{item.location}</Text>
+                      <Text style={item.kind === 'planned' ? styles.plannedLabel : styles.loggedLabel}>{item.kind === 'planned' ? 'PLANNED' : 'LOGGED'}</Text>
+                    </View>
+                    <Text style={styles.listCountry}>{item.country} · {formatDate(item.date)}</Text>
+                    <Text style={styles.listMeta}>{item.maxDepth}m max · {item.duration} min{item.buddy ? ` · ${item.buddy}` : ''}{item.tripName ? ` · ${item.tripName}` : ''}</Text>
+                  </View>
+                  <Text style={styles.listChevron}>›</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>}
 
           {selected ? <View style={styles.detailCard}>
-            <View style={styles.detailHeader}><View style={styles.detailCopy}><Text style={styles.detailEyebrow}>{selected.kind === 'planned' ? 'Upcoming plan' : 'Logged dive'}</Text><Text style={styles.detailTitle} numberOfLines={1}>{selected.location}</Text></View><TouchableOpacity accessibilityLabel="Close activity details" onPress={() => setSelected(null)}><Text style={styles.closeText}>×</Text></TouchableOpacity></View>
+            <View style={styles.detailHeader}><View style={styles.detailCopy}><Text style={styles.detailEyebrow}>{selected.kind === 'planned' ? 'Upcoming plan' : 'Logged dive'}</Text><Text style={styles.detailTitle} numberOfLines={1}>{selected.location}</Text></View><TouchableOpacity accessibilityRole="button" accessibilityLabel="Close activity details" onPress={() => setSelected(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.closeButton}><Text style={styles.closeText}>×</Text></TouchableOpacity></View>
             <Text style={styles.detailSub}>{selected.country} · {formatDate(selected.date)}</Text>
             <View style={styles.detailMetrics}><Text style={styles.detailMetric}>{selected.maxDepth}m max</Text><Text style={styles.detailMetric}>{selected.duration} minutes</Text>{selected.tripName ? <Text style={styles.detailMetric}>{selected.tripName}</Text> : null}</View>
-            <TouchableOpacity style={styles.detailButton} onPress={() => selected.kind === 'planned' ? navigation.navigate('PlannedDiveDetail', { planId: selected.id }) : navigation.navigate('DiveDetail', { diveId: selected.id })}><Text style={styles.detailButtonText}>{selected.kind === 'planned' ? 'Open planned dive' : 'Open dive log'}</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" style={styles.detailButton} onPress={() => selected.kind === 'planned' ? navigation.navigate('PlannedDiveDetail', { planId: selected.id }) : navigation.navigate('DiveDetail', { diveId: selected.id })}><Text style={styles.detailButtonText}>{selected.kind === 'planned' ? 'Open planned dive' : 'Open dive log'}</Text></TouchableOpacity>
           </View> : null}
         </>}
       </ScrollView>
@@ -263,105 +286,112 @@ export default function DiveActivityScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f7f9fc' },
   content: { width: '100%', maxWidth: 1160, alignSelf: 'center', padding: 20, paddingBottom: 48 },
-  hero: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 16, backgroundColor: '#e7f6fb', borderWidth: 1, borderColor: '#c5e9f3', borderRadius: 22, padding: 24, marginBottom: 18, overflow: 'hidden' },
-  heroCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 420, minWidth: 365 },
-  eyebrow: { color: '#00A8A8', fontSize: 11, fontWeight: 'bold', letterSpacing: 3.6, marginBottom: -2, marginLeft: -8 },
-  title: { color: '#0077CC', fontSize: 28, fontWeight: 'bold', marginTop: -3, marginLeft: 8 },
-  subtitle: { color: '#425466', fontSize: 15, marginTop: -1, lineHeight: 17, maxWidth: 360 },
-  heroActions: { flexDirection: 'row', flexWrap: 'nowrap', gap: 9, alignItems: 'center', minWidth: 330 },
-  primaryAction: { backgroundColor: '#0077CC', borderRadius: 22, paddingHorizontal: 17, paddingVertical: 12 },
+  hero: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 16, backgroundColor: '#e7f6fb', borderWidth: 1, borderColor: '#c5e9f3', borderRadius: 22, padding: 24, marginBottom: 18 },
+  heroCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 320, minWidth: 0 },
+  eyebrow: { color: '#00A8A8', fontSize: 11, fontWeight: 'bold', letterSpacing: 1.5, marginBottom: 6 },
+  title: { color: '#0077CC', fontSize: 28, fontWeight: 'bold' },
+  subtitle: { color: '#425466', fontSize: 15, marginTop: 6, lineHeight: 21, maxWidth: 540 },
+  heroActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
+  primaryAction: { backgroundColor: '#0077CC', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 12 },
   primaryActionText: { color: '#fff', fontWeight: 'bold' },
-  secondaryAction: { borderWidth: 1, borderColor: '#00A8A8', borderRadius: 22, paddingHorizontal: 15, paddingVertical: 11, backgroundColor: '#fff' },
+  secondaryAction: { borderWidth: 1, borderColor: '#00A8A8', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, backgroundColor: '#fff' },
   secondaryActionText: { color: '#008d8d', fontWeight: 'bold' },
-  toolbar: { flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: 12, minWidth: 850, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 16, padding: 14, marginBottom: 18, overflow: 'hidden' },
-  searchInput: { flexGrow: 1, flexShrink: 0, flexBasis: 360, minWidth: 300, minHeight: 46, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 13, paddingHorizontal: 13, color: '#334155', backgroundColor: '#fff', fontSize: 15 },
-  modeToggle: { flexDirection: 'row', width: 140, height: 38, borderRadius: 12, backgroundColor: '#e5f0f4', padding: 3, overflow: 'hidden' },
-  modeButton: { width: 82, paddingHorizontal: 17, paddingVertical: 10, borderRadius: 9, marginRight: -8 },
-  modeButtonActive: { backgroundColor: '#fff', elevation: 2, zIndex: 2 },
-  modeText: { color: '#5b7280', fontWeight: '600' },
+  toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 16, padding: 14, marginBottom: 18 },
+  searchInput: { flexGrow: 1, flexShrink: 1, flexBasis: 260, minWidth: 0, minHeight: 44, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 12, paddingHorizontal: 14, color: '#334155', backgroundColor: '#fff', fontSize: 14 },
+  modeToggle: { flexDirection: 'row', borderRadius: 12, backgroundColor: '#e5f0f4', padding: 3, alignItems: 'center' },
+  modeButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 9 },
+  modeButtonActive: { backgroundColor: '#fff', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
+  modeText: { color: '#5b7280', fontWeight: '600', fontSize: 13 },
   modeTextActive: { color: '#0077CC' },
-  filterRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 8, minWidth: 250 },
-  filterChip: { width: 72, height: 31, minHeight: 31, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 18, paddingHorizontal: 4, paddingVertical: 4, marginTop: 4 },
-  filterChipActive: { backgroundColor: '#0077CC', borderColor: '#0077CC', marginTop: -2, marginBottom: 6 },
-  filterText: { color: '#0077CC', fontWeight: 'bold', fontSize: 13, letterSpacing: -0.4 },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
+  filterChip: { minHeight: 34, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: '#fff' },
+  filterChipActive: { backgroundColor: '#0077CC', borderColor: '#0077CC' },
+  filterText: { color: '#0077CC', fontWeight: 'bold', fontSize: 13 },
   filterTextActive: { color: '#fff' },
   loader: { marginTop: 32 },
   errorCard: { backgroundColor: '#fff4f3', borderWidth: 1, borderColor: '#f2c6c2', borderRadius: 16, alignItems: 'center', padding: 24 },
   errorText: { color: '#a33a33', textAlign: 'center', fontWeight: '600' },
   retryButton: { marginTop: 14, borderWidth: 1, borderColor: '#a33a33', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 9 },
   retryText: { color: '#a33a33', fontWeight: 'bold' },
-  summaryRow: { flexDirection: 'row', gap: 10, minWidth: 720, marginBottom: 18 },
-  summaryCard: { flex: 1, minWidth: 170, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e1ecf2', borderRadius: 14, padding: 14, shadowColor: '#0077CC', shadowOffset: { width: 8, height: 10 }, shadowOpacity: 0.25, shadowRadius: 2, elevation: 8 },
-  summaryValue: { color: '#0077CC', fontSize: 21, fontWeight: 'bold' },
-  summaryLabel: { color: '#6a7d8d', fontSize: 11, marginTop: 4 },
-  calendarCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 18, padding: 14, overflow: 'hidden', minWidth: 800 },
-  calendarToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minWidth: 770, marginBottom: 14, position: 'relative', zIndex: 4 },
-  monthTitle: { color: '#164c67', fontSize: 20, fontWeight: 'bold', textTransform: 'capitalize', minWidth: 300, textAlign: 'center', marginHorizontal: -24 },
-  monthActions: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 165, justifyContent: 'flex-end', marginLeft: -28 },
-  monthButton: { width: 32, height: 32, borderRadius: 11, backgroundColor: '#edf7fa', alignItems: 'center', justifyContent: 'center', marginHorizontal: -5 },
-  monthButtonText: { color: '#0077CC', fontSize: 28, lineHeight: 28 },
-  todayButton: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 11, paddingHorizontal: 10, paddingVertical: 9 },
-  todayText: { color: '#0077CC', fontSize: 12, fontWeight: 'bold' },
-  weekdayRow: { flexDirection: 'row', minWidth: 770, borderBottomWidth: 1, borderBottomColor: '#e7eef3', paddingBottom: 8, marginHorizontal: -6 },
-  weekday: { flex: 1, minWidth: 110, textAlign: 'center', color: '#7a8e9c', fontSize: 11, fontWeight: 'bold' },
-  calendarWeek: { flexDirection: 'row', minWidth: 770, position: 'relative' },
-  dayCell: { flex: 1, minWidth: 105, minHeight: 92, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#e7eef3', padding: 5, overflow: 'visible', position: 'relative' },
+  summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 18 },
+  summaryCard: { flex: 1, minWidth: 140, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e1ecf2', borderRadius: 14, padding: 14, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  summaryValue: { color: '#0077CC', fontSize: 22, fontWeight: 'bold' },
+  summaryLabel: { color: '#6a7d8d', fontSize: 12, marginTop: 4 },
+  calendarCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 18, padding: 16, overflow: 'hidden' },
+  calendarToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 },
+  monthTitle: { color: '#164c67', fontSize: 20, fontWeight: 'bold', textTransform: 'capitalize' },
+  monthActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  monthButton: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#edf7fa', alignItems: 'center', justifyContent: 'center' },
+  monthButtonText: { color: '#0077CC', fontSize: 22, lineHeight: 24, fontWeight: 'bold' },
+  todayButton: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 11, paddingHorizontal: 12, paddingVertical: 7 },
+  todayText: { color: '#0077CC', fontSize: 13, fontWeight: 'bold' },
+  calendarScrollContent: { minWidth: '100%' },
+  calendarGridContainer: { minWidth: 640, width: '100%' },
+  weekdayRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e7eef3', paddingBottom: 10, marginBottom: 2 },
+  weekday: { flex: 1, textAlign: 'center', color: '#7a8e9c', fontSize: 12, fontWeight: 'bold' },
+  calendarWeek: { flexDirection: 'row' },
+  dayCell: { flex: 1, minHeight: 90, borderWidth: 0.5, borderColor: '#e7eef3', padding: 6, backgroundColor: '#fff' },
   dayCellMuted: { backgroundColor: '#fbfcfd' },
-  dayNumber: { alignSelf: 'flex-end', color: '#526a79', fontSize: 12, marginBottom: 4 },
+  dayCellSelected: { backgroundColor: '#f0f9ff', borderColor: '#0077CC', borderWidth: 1.5 },
+  dayNumber: { alignSelf: 'flex-end', color: '#526a79', fontSize: 12, fontWeight: '600', marginBottom: 4 },
   dayNumberMuted: { color: '#becbd2' },
-  activityPill: { borderRadius: 6, paddingHorizontal: 5, paddingVertical: 4, marginBottom: -2, marginRight: -26, width: '126%', height: 24, position: 'relative', zIndex: 8, shadowColor: '#164c67', shadowOffset: { width: -4, height: 4 }, shadowOpacity: 0.25, shadowRadius: 0, elevation: 4 },
-  loggedPill: { backgroundColor: '#e5f4fb' },
-  plannedPill: { backgroundColor: '#e6f7f3' },
-  activityPillText: { color: '#25627d', fontSize: 10, fontWeight: '600' },
-  moreText: { color: '#0077CC', fontSize: 10, marginTop: -1, marginLeft: 3, position: 'relative', zIndex: 10 },
-  dayDetailCard: { minWidth: 720, marginHorizontal: -28, marginTop: -10, padding: 18, backgroundColor: '#f9feff', borderTopWidth: 3, borderTopColor: '#00A8A8', shadowColor: '#164c67', shadowOffset: { width: 9, height: -5 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 10, zIndex: 15 },
-  dayDetailHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
-  dayDetailTitle: { color: '#164c67', fontSize: 19, fontWeight: 'bold', marginTop: 3, textTransform: 'capitalize' },
-  dayDetailList: { gap: 8 },
-  dayActivityRow: { minWidth: 580, height: 74, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 11, borderWidth: 1, borderColor: '#d9eaf0', paddingHorizontal: 13, paddingVertical: 10, marginBottom: -8, shadowColor: '#0077CC', shadowOffset: { width: -6, height: 3 }, shadowOpacity: 0.2, shadowRadius: 7, elevation: 5 },
-  dayActivityRowPlanned: { borderLeftWidth: 5, borderLeftColor: '#55c6ad' },
+  dayNumberSelected: { color: '#0077CC', fontWeight: 'bold' },
+  pillsContainer: { gap: 4, width: '100%' },
+  activityPill: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, height: 24, justifyContent: 'center', width: '100%' },
+  loggedPill: { backgroundColor: '#e5f4fb', borderWidth: 1, borderColor: '#b8d8ee' },
+  plannedPill: { backgroundColor: '#e6f7f3', borderWidth: 1, borderColor: '#b6e9de' },
+  activityPillText: { color: '#164c67', fontSize: 10, fontWeight: '600' },
+  moreText: { color: '#0077CC', fontSize: 10, fontWeight: '600', marginTop: 2, paddingLeft: 2 },
+  legend: { flexDirection: 'row', gap: 16, paddingTop: 14, marginTop: 10, borderTopWidth: 1, borderTopColor: '#edf2f5', alignItems: 'center' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  loggedDot: { backgroundColor: '#0077CC' },
+  plannedDot: { backgroundColor: '#00A8A8' },
+  legendText: { color: '#6a7d8d', fontSize: 12 },
+  dayDetailCard: { marginTop: 16, padding: 18, backgroundColor: '#f8fcfe', borderRadius: 14, borderWidth: 1, borderColor: '#c5e9f3', borderTopWidth: 3, borderTopColor: '#00A8A8' },
+  dayDetailHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 10 },
+  dayDetailHeaderCopy: { flex: 1, minWidth: 0 },
+  dayDetailTitle: { color: '#164c67', fontSize: 18, fontWeight: 'bold', marginTop: 3 },
+  dayDetailList: { gap: 10 },
+  dayActivityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#d9eaf0', paddingHorizontal: 14, paddingVertical: 12, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
+  dayActivityRowPlanned: { borderLeftWidth: 4, borderLeftColor: '#00A8A8' },
   dayActivityCopy: { flex: 1, minWidth: 0 },
   dayActivityLocation: { color: '#164c67', fontSize: 15, fontWeight: 'bold' },
   dayActivityMeta: { color: '#6a7d8d', fontSize: 12, marginTop: 4 },
-  dayActivityStatus: { color: '#008d8d', fontSize: 11, marginTop: 5 },
-  dayActivityArrow: { color: '#0077CC', fontSize: 26, marginLeft: 12 },
-  noDayActivity: { minHeight: 120, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 25, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderStyle: 'dashed', borderColor: '#b8d8ee' },
-  noDayTitle: { color: '#164c67', fontSize: 16, fontWeight: 'bold' },
-  noDayText: { color: '#6a7d8d', textAlign: 'center', marginTop: 5, maxWidth: 420 },
-  noDayButton: { backgroundColor: '#0077CC', borderRadius: 18, paddingHorizontal: 15, paddingVertical: 8, marginTop: 12 },
+  dayActivityStatus: { color: '#008d8d', fontSize: 11, fontWeight: '600', marginTop: 4 },
+  dayActivityArrow: { color: '#0077CC', fontSize: 22, marginLeft: 10, fontWeight: 'bold' },
+  noDayActivity: { minHeight: 110, alignItems: 'center', justifyContent: 'center', padding: 20, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderStyle: 'dashed', borderColor: '#b8d8ee' },
+  noDayTitle: { color: '#164c67', fontSize: 15, fontWeight: 'bold' },
+  noDayText: { color: '#6a7d8d', textAlign: 'center', marginTop: 4, fontSize: 13, maxWidth: 380 },
+  noDayButton: { backgroundColor: '#0077CC', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 8, marginTop: 12 },
   noDayButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
-  legend: { flexDirection: 'row', gap: 14, paddingTop: 13, marginTop: -18, marginLeft: 12, position: 'relative', zIndex: 12, backgroundColor: 'rgba(255,255,255,0.94)' },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 9, height: 9, borderRadius: 5 },
-  loggedDot: { backgroundColor: '#56acd2' },
-  plannedDot: { backgroundColor: '#55c6ad' },
-  legendText: { color: '#6a7d8d', fontSize: 12 },
   list: { gap: 12 },
-  listCard: { flexDirection: 'row', alignItems: 'center', minWidth: 680, marginBottom: -6, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 16, padding: 15, shadowColor: '#164c67', shadowOffset: { width: 12, height: -5 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 9 },
-  listCardPlanned: { borderLeftWidth: 4, borderLeftColor: '#55c6ad' },
-  listDate: { width: 76, alignItems: 'center', borderRightWidth: 1, borderRightColor: '#e7eef3', marginRight: 13, paddingRight: 12 },
-  listDateDay: { color: '#0077CC', fontSize: 22, fontWeight: 'bold' },
+  listCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 16, padding: 14, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  listCardPlanned: { borderLeftWidth: 4, borderLeftColor: '#00A8A8' },
+  listDate: { width: 64, alignItems: 'center', borderRightWidth: 1, borderRightColor: '#e7eef3', marginRight: 12, paddingRight: 10 },
+  listDateDay: { color: '#0077CC', fontSize: 20, fontWeight: 'bold' },
   listDateMonth: { color: '#6a7d8d', textTransform: 'uppercase', fontSize: 11, fontWeight: 'bold' },
   listMain: { flex: 1, minWidth: 0 },
-  listTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  listLocation: { flex: 1, color: '#164c67', fontSize: 16, fontWeight: 'bold' },
-  listCountry: { color: '#6a7d8d', fontSize: 12, marginTop: 5 },
-  listMeta: { color: '#7c8f9c', fontSize: 12, marginTop: 8 },
-  loggedLabel: { color: '#0077CC', backgroundColor: '#e5f4fb', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 9, fontWeight: 'bold' },
-  plannedLabel: { color: '#008d78', backgroundColor: '#e6f7f3', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 9, fontWeight: 'bold' },
-  listChevron: { color: '#0077CC', fontSize: 26, marginLeft: 8 },
+  listTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  listLocation: { flex: 1, minWidth: 120, color: '#164c67', fontSize: 16, fontWeight: 'bold' },
+  listCountry: { color: '#6a7d8d', fontSize: 12, marginTop: 4 },
+  listMeta: { color: '#7c8f9c', fontSize: 12, marginTop: 6 },
+  loggedLabel: { color: '#0077CC', backgroundColor: '#e5f4fb', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, fontSize: 10, fontWeight: 'bold' },
+  plannedLabel: { color: '#008d78', backgroundColor: '#e6f7f3', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, fontSize: 10, fontWeight: 'bold' },
+  listChevron: { color: '#0077CC', fontSize: 22, marginLeft: 8, fontWeight: 'bold' },
   emptyCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 16, alignItems: 'center', padding: 28 },
   emptyTitle: { color: '#164c67', fontSize: 18, fontWeight: 'bold' },
   emptyText: { color: '#6a7d8d', textAlign: 'center', marginTop: 7 },
-  detailCard: { backgroundColor: '#fff', minWidth: 620, marginHorizontal: -24, borderRadius: 17, borderLeftWidth: 5, borderLeftColor: '#00A8A8', padding: 17, marginTop: 18, shadowColor: '#164c67', shadowOffset: { width: 15, height: 5 }, shadowOpacity: 0.32, shadowRadius: 20, elevation: 14 },
-  detailHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  detailCard: { backgroundColor: '#fff', borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#00A8A8', padding: 18, marginTop: 18, borderWidth: 1, borderColor: '#dbe6ee', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
+  detailHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   detailCopy: { flex: 1, minWidth: 0 },
-  detailEyebrow: { color: '#00A8A8', textTransform: 'uppercase', fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
-  detailTitle: { color: '#164c67', fontSize: 21, fontWeight: 'bold', marginTop: 3 },
-  closeText: { color: '#6e8794', fontSize: 26, lineHeight: 23, paddingHorizontal: 4 },
-  detailSub: { color: '#6e8794', marginTop: 7 },
-  detailMetrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
-  detailMetric: { color: '#0077CC', backgroundColor: '#edf8fb', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7, fontSize: 12 },
-  detailButton: { alignSelf: 'flex-end', marginTop: 15, backgroundColor: '#0077CC', borderRadius: 10, paddingHorizontal: 15, paddingVertical: 9 },
-  detailButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
+  detailEyebrow: { color: '#00A8A8', textTransform: 'uppercase', fontSize: 11, fontWeight: 'bold', letterSpacing: 1 },
+  detailTitle: { color: '#164c67', fontSize: 20, fontWeight: 'bold', marginTop: 4 },
+  closeButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  closeText: { color: '#475569', fontSize: 22, lineHeight: 22, fontWeight: 'bold' },
+  detailSub: { color: '#6e8794', marginTop: 6, fontSize: 13 },
+  detailMetrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  detailMetric: { color: '#0077CC', backgroundColor: '#edf8fb', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 12, fontWeight: '600' },
+  detailButton: { alignSelf: 'flex-start', marginTop: 16, backgroundColor: '#0077CC', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  detailButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
 });
