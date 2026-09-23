@@ -66,32 +66,60 @@ export default function PlanDiveScreen({ navigation }: any) {
 
   const savePlan = async () => {
     setSaveError('');
-    const dateMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(date.trim());
-    const isoDateMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(date.trim());
+    const trimmedCountry = country.trim();
+    const trimmedSite = site.trim();
+    const trimmedDate = date.trim();
+
+    if (!trimmedCountry) {
+      setSaveError('Please select a country.');
+      return;
+    }
+    if (!trimmedSite) {
+      setSaveError('Please enter a dive site name.');
+      return;
+    }
+    if (!trimmedDate) {
+      setSaveError('Please enter a planned date (DD/MM/YYYY).');
+      return;
+    }
+
+    const dateMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmedDate);
+    const isoDateMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(trimmedDate);
     const day = dateMatch ? Number(dateMatch[1]) : isoDateMatch ? Number(isoDateMatch[3]) : 0;
     const month = dateMatch ? Number(dateMatch[2]) : isoDateMatch ? Number(isoDateMatch[2]) : 0;
     const year = dateMatch ? Number(dateMatch[3]) : isoDateMatch ? Number(isoDateMatch[1]) : 0;
     const parsedDate = day && month && year
       ? new Date(year, month - 1, day, 12, 0, 0)
       : null;
-    if (!country || !site.trim() || (!dateMatch && !isoDateMatch) || !parsedDate || Number.isNaN(parsedDate.getTime())
+
+    if (!dateMatch && !isoDateMatch) {
+      setSaveError('Enter a valid date in DD/MM/YYYY format.');
+      return;
+    }
+    if (!parsedDate || Number.isNaN(parsedDate.getTime())
       || parsedDate.getDate() !== day || parsedDate.getMonth() !== month - 1
       || parsedDate.getFullYear() !== year) {
-      setSaveError('Add a valid country, dive site and date (DD/MM/YYYY) before saving.');
+      setSaveError('The date entered is not a valid calendar date.');
       return;
     }
+
     const maxDepth = Number(depth);
     const plannedDuration = Number(duration);
-    if (!Number.isFinite(maxDepth) || maxDepth < 1 || !Number.isInteger(plannedDuration) || plannedDuration < 1) {
-      setSaveError('Depth and duration must be valid positive numbers.');
+    if (!Number.isFinite(maxDepth) || maxDepth < 1) {
+      setSaveError('Max depth must be a positive number in meters.');
       return;
     }
+    if (!Number.isInteger(plannedDuration) || plannedDuration < 1) {
+      setSaveError('Duration must be a positive whole number of minutes.');
+      return;
+    }
+
     setSaving(true);
     try {
       await API.post('/planned-dives', {
         date: parsedDate.toISOString(),
-        country,
-        location: site.trim(),
+        country: trimmedCountry,
+        location: trimmedSite,
         maxDepth,
         duration: plannedDuration,
         buddy: buddy.trim() || 'Solo diver',
@@ -120,7 +148,7 @@ export default function PlanDiveScreen({ navigation }: any) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.hero, Platform.OS === 'web' && styles.webHero]}>
+        <View style={styles.hero}>
           <View style={styles.heroCopy}>
             <Text style={styles.eyebrow}>PRE-DIVE PLANNER</Text>
             <Text style={styles.title}>Plan your next dive</Text>
@@ -132,7 +160,7 @@ export default function PlanDiveScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={[styles.formGrid, Platform.OS === 'web' && styles.webFormGrid]}>
+        <View style={styles.formGrid}>
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>Dive details</Text>
             <Text style={styles.label}>Country</Text>
@@ -151,6 +179,7 @@ export default function PlanDiveScreen({ navigation }: any) {
             <TextInput
               accessibilityLabel="Dive site"
               placeholder="Cala de la Mar"
+              placeholderTextColor="#7890a0"
               value={site}
               onChangeText={setSite}
               style={styles.input}
@@ -161,6 +190,7 @@ export default function PlanDiveScreen({ navigation }: any) {
                 <TextInput
                   accessibilityLabel="Planned date"
                   placeholder="DD/MM/YYYY"
+                  placeholderTextColor="#7890a0"
                   value={date}
                   onChangeText={setDate}
                   style={styles.input}
@@ -171,6 +201,7 @@ export default function PlanDiveScreen({ navigation }: any) {
                 <TextInput
                   accessibilityLabel="Buddy name"
                   placeholder="Add a buddy"
+                  placeholderTextColor="#7890a0"
                   value={buddy}
                   onChangeText={setBuddy}
                   style={styles.input}
@@ -200,7 +231,7 @@ export default function PlanDiveScreen({ navigation }: any) {
               </View>
             </View>
             <Text style={styles.label}>Expected conditions</Text>
-            <View style={[styles.conditionRow, Platform.OS === 'web' && styles.webConditionRow]}>
+            <View style={styles.conditionRow}>
               {CONDITIONS.map((option) => (
                 <TouchableOpacity
                   key={option}
@@ -215,10 +246,10 @@ export default function PlanDiveScreen({ navigation }: any) {
             </View>
           </View>
 
-          <View style={[styles.panel, Platform.OS === 'web' && styles.webEquipmentPanel]}>
+          <View style={styles.panel}>
             <Text style={styles.panelTitle}>Equipment setup</Text>
             <Text style={styles.label}>Gas mix</Text>
-            <View style={[styles.gasRow, Platform.OS === 'web' && styles.webGasRow]}>
+            <View style={styles.gasRow}>
               {GAS_OPTIONS.map((option) => (
                 <TouchableOpacity
                   key={option}
@@ -244,14 +275,14 @@ export default function PlanDiveScreen({ navigation }: any) {
                 thumbColor={shoreEntry ? '#00A8A8' : '#f8fafc'}
               />
             </View>
-            <View style={[styles.noticeRow, Platform.OS === 'web' && styles.webNoticeRow]}>
+            <View style={styles.noticeRow}>
               <Text style={styles.noticeIcon}>!</Text>
               <Text style={styles.noticeText}>Confirm the local tide, exit route and emergency contact before departure.</Text>
             </View>
           </View>
         </View>
 
-        <View style={[styles.panel, Platform.OS === 'web' && styles.webChecklistPanel]}>
+        <View style={styles.panel}>
           <View style={styles.checklistHeading}>
             <View>
               <Text style={styles.panelTitle}>Equipment checklist</Text>
@@ -259,7 +290,7 @@ export default function PlanDiveScreen({ navigation }: any) {
             </View>
             <Text style={styles.checklistCount}>{completed} of {CHECKLIST.length}</Text>
           </View>
-          <View style={[styles.checklistGroups, Platform.OS === 'web' && styles.webChecklistGroups]}>
+          <View style={styles.checklistGroups}>
             {Object.entries(groupedChecklist).map(([group, items]) => (
               <View key={group} style={styles.checklistGroup}>
                 <Text style={styles.groupLabel}>{group}</Text>
@@ -274,7 +305,7 @@ export default function PlanDiveScreen({ navigation }: any) {
                     <View style={[styles.checkbox, checked[item.id] && styles.checkboxActive]}>
                       {checked[item.id] ? <Text style={styles.checkmark}>✓</Text> : null}
                     </View>
-                    <Text style={styles.checkLabel} numberOfLines={1}>{item.label}</Text>
+                    <Text style={styles.checkLabel}>{item.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -282,12 +313,13 @@ export default function PlanDiveScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={[styles.panel, Platform.OS === 'web' && styles.webNotesPanel]}>
+        <View style={styles.panel}>
           <Text style={styles.panelTitle}>Plan notes</Text>
           <TextInput
             accessibilityLabel="Plan notes"
             multiline
             placeholder="Add a route, meeting point or safety note"
+            placeholderTextColor="#7890a0"
             value={notes}
             onChangeText={setNotes}
             style={[styles.input, styles.notesInput]}
@@ -295,7 +327,7 @@ export default function PlanDiveScreen({ navigation }: any) {
         </View>
       </ScrollView>
 
-      <View style={[styles.saveBar, Platform.OS === 'web' && styles.webSaveBar]}>
+      <View style={styles.saveBar}>
         <View style={styles.saveCopy}>
           <Text style={styles.saveTitle}>{saved ? 'Plan saved' : 'Ready to plan?'}</Text>
           <Text style={saveError ? styles.saveErrorText : styles.saveHint}>{saveError || (saved ? 'Opening your planned dives.' : `${completed}/${CHECKLIST.length} equipment checks complete`)}</Text>
@@ -312,39 +344,34 @@ export default function PlanDiveScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f7f9fc', overflow: 'hidden' },
+  screen: { flex: 1, backgroundColor: '#f7f9fc' },
   container: { flex: 1 },
   content: { width: '100%', maxWidth: 1120, alignSelf: 'center', padding: 20, paddingBottom: 28 },
-  hero: { minWidth: 780, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e7f6fb', borderRadius: 22, padding: 24, marginBottom: 18, borderWidth: 1, borderColor: '#c5e9f3', overflow: 'hidden' },
-  webHero: { zIndex: 8, marginBottom: -8, boxShadow: '0 10px 24px rgba(0, 119, 204, 0.16)' } as any,
-  heroCopy: { flex: 1, paddingRight: 20 },
+  hero: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e7f6fb', borderRadius: 22, padding: 24, marginBottom: 18, borderWidth: 1, borderColor: '#c5e9f3', gap: 16 },
+  heroCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 280 },
   eyebrow: { color: '#00A8A8', fontSize: 11, fontWeight: 'bold', letterSpacing: 1.2, marginBottom: 7 },
   title: { color: '#0077CC', fontSize: 28, fontWeight: 'bold' },
   subtitle: { color: '#425466', fontSize: 15, marginTop: 7, lineHeight: 21 },
   progressBadge: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 5, borderColor: '#00A8A8' },
   progressValue: { color: '#0077CC', fontWeight: 'bold', fontSize: 22 },
   progressLabel: { color: '#587080', fontSize: 12, marginTop: 2 },
-  formGrid: { flexDirection: 'row', flexWrap: 'nowrap', gap: 18, marginBottom: 18 },
-  webFormGrid: { flexWrap: 'nowrap', width: 1040 },
-  panel: { flex: 1, minWidth: 460, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#dbe6ee', padding: 20, marginBottom: 18 },
-  webEquipmentPanel: { minWidth: 470, marginLeft: -28, zIndex: 2, boxShadow: '0 14px 24px rgba(0, 119, 204, 0.18)' } as any,
+  formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginBottom: 18 },
+  panel: { flexGrow: 1, flexShrink: 1, flexBasis: 340, width: '100%', maxWidth: '100%', backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#dbe6ee', padding: 20, marginBottom: 18 },
   panelTitle: { color: '#1e293b', fontSize: 19, fontWeight: 'bold', marginBottom: 5 },
   panelSubtitle: { color: '#6b7c8d', fontSize: 13, marginBottom: 16 },
   label: { color: '#334155', fontSize: 13, fontWeight: 'bold', marginTop: 14, marginBottom: 7 },
-  input: { width: '100%', minWidth: 0, minHeight: 48, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 13, paddingVertical: 11, color: '#fff', fontSize: 15 },
+  input: { width: '100%', minWidth: 0, minHeight: 48, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 13, paddingVertical: 11, color: '#1e293b', fontSize: 15 },
   pickerWrap: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', overflow: 'hidden' },
-  picker: { height: 48, color: '#fff' },
-  twoFields: { flexDirection: 'row', flexWrap: 'nowrap', gap: 12 },
-  fieldHalf: { flex: 1, minWidth: 210 },
-  conditionRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 8 },
-  webConditionRow: { width: 570, flexWrap: 'nowrap' },
-  chip: { minWidth: 112, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#fff' },
-  chipActive: { backgroundColor: '#e7f6fb', borderColor: '#b8d8ee' },
+  picker: { height: 48, color: '#1e293b' },
+  twoFields: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  fieldHalf: { flexGrow: 1, flexShrink: 1, flexBasis: 140 },
+  conditionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { minWidth: 90, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#fff', alignItems: 'center' },
+  chipActive: { backgroundColor: '#e7f6fb', borderColor: '#0077CC' },
   chipText: { color: '#0077CC', fontSize: 13, fontWeight: 'bold' },
-  chipTextActive: { color: '#b8d8ee' },
-  gasRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 8 },
-  webGasRow: { width: 540, flexWrap: 'nowrap' },
-  gasOption: { minWidth: 92, borderRadius: 13, borderWidth: 1, borderColor: '#c9e4f4', padding: 11, alignItems: 'center', backgroundColor: '#f7fbff' },
+  chipTextActive: { color: '#0077CC' },
+  gasRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  gasOption: { flexGrow: 1, flexBasis: 90, borderRadius: 13, borderWidth: 1, borderColor: '#c9e4f4', padding: 11, alignItems: 'center', backgroundColor: '#f7fbff' },
   gasOptionActive: { backgroundColor: '#e2f7f5', borderColor: '#00A8A8' },
   gasText: { color: '#3c5b70', fontSize: 13, fontWeight: 'bold' },
   gasTextActive: { color: '#008d8d' },
@@ -353,33 +380,28 @@ const styles = StyleSheet.create({
   toggleTitle: { color: '#334155', fontWeight: 'bold', fontSize: 15 },
   toggleHint: { color: '#728396', fontSize: 12, marginTop: 3 },
   noticeRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, backgroundColor: '#fff6dc', padding: 12, marginTop: 18, gap: 9 },
-  webNoticeRow: { width: 600, alignSelf: 'flex-start' },
   noticeIcon: { width: 22, height: 22, lineHeight: 22, textAlign: 'center', borderRadius: 11, backgroundColor: '#f4b942', color: '#fff', fontWeight: 'bold' },
   noticeText: { color: '#795d20', fontSize: 12, flex: 1, lineHeight: 17 },
-  checklistHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 },
+  checklistHeading: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 8 },
   checklistCount: { color: '#00A8A8', fontWeight: 'bold', marginTop: 3 },
-  checklistGroups: { gap: 18 },
-  webChecklistPanel: { overflow: 'hidden', boxShadow: '0 12px 22px rgba(0, 0, 0, 0.2)' } as any,
-  webChecklistGroups: { width: 1010, flexDirection: 'row', flexWrap: 'nowrap', gap: 18 },
-  checklistGroup: { flex: 1, minWidth: 330 },
+  checklistGroups: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  checklistGroup: { flexGrow: 1, flexShrink: 1, flexBasis: 280, minWidth: 240 },
   groupLabel: { color: '#0077CC', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 9 },
-  checkItem: { minHeight: 62, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fbfd', borderRadius: 14, borderWidth: 1, borderColor: '#e0edf4', paddingHorizontal: 12, paddingVertical: 10, marginBottom: 9 },
+  checkItem: { minHeight: 56, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fbfd', borderRadius: 14, borderWidth: 1, borderColor: '#e0edf4', paddingHorizontal: 12, paddingVertical: 10, marginBottom: 9 },
   checkItemActive: { backgroundColor: '#edfbf9', borderColor: '#91ddd5' },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#aac8d8', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   checkboxActive: { backgroundColor: '#00A8A8', borderColor: '#00A8A8' },
   checkmark: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  checkLabel: { color: '#334155', flex: 1, fontSize: 13 },
-  notesInput: { minHeight: 100, width: 720, textAlignVertical: 'top' },
-  webNotesPanel: { marginTop: -12, zIndex: 1 },
-  saveBar: { flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#dbe6ee' },
-  webSaveBar: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 78, zIndex: 20, boxShadow: '0 -8px 18px rgba(15, 23, 42, 0.2)' } as any,
-  saveCopy: { flex: 1, minWidth: 330 },
+  checkLabel: { color: '#334155', flex: 1, fontSize: 13, lineHeight: 18 },
+  notesInput: { minHeight: 100, width: '100%', textAlignVertical: 'top' },
+  saveBar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#dbe6ee' },
+  saveCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 240 },
   saveTitle: { color: '#1e293b', fontWeight: 'bold', fontSize: 14 },
   saveHint: { color: '#728396', fontSize: 12, marginTop: 3 },
   saveErrorText: { color: '#a43b3b', fontSize: 12, marginTop: 3, fontWeight: 'bold' },
-  saveButton: { backgroundColor: '#0077CC', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 12, minWidth: 145, alignItems: 'center' },
+  saveButton: { backgroundColor: '#0077CC', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 12, minWidth: 130, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.55 },
   saveButtonText: { color: '#fff', fontWeight: 'bold' },
-  logButton: { borderWidth: 1, borderColor: '#00A8A8', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, minWidth: 120, alignItems: 'center' },
+  logButton: { borderWidth: 1, borderColor: '#00A8A8', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, minWidth: 110, alignItems: 'center' },
   logButtonText: { color: '#008d8d', fontWeight: 'bold' },
 });
