@@ -36,7 +36,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
       const res = await API.get(`/dives/my`);
       const myDive = res.data.find((d: Dive) => d.id === diveId);
       if (!myDive) {
-        setLoadError('This dive is no longer available.');
+        setLoadError('You did not participate in this dive.');
         return;
       }
       setDive(myDive);

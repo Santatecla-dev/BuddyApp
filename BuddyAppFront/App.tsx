@@ -21,6 +21,7 @@ import EquipmentScreen from './src/screens/EquipmentScreen';
 import EquipmentDetailScreen from './src/screens/EquipmentDetailScreen';
 import AchievementsScreen from './src/screens/AchievementsScreen';
 import PokedexScreen from './src/screens/PokedexScreen';
+import ActivityFeedScreen from './src/screens/ActivityFeedScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -54,6 +55,7 @@ export default function App() {
         <Stack.Screen name="EquipmentDetail" component={EquipmentDetailScreen} options={{ title: 'Equipment detail' }} />
         <Stack.Screen name="Achievements" component={AchievementsScreen} options={{ title: 'Achievements' }} />
         <Stack.Screen name="Pokedex" component={PokedexScreen} options={{ title: 'Pokedex' }} />
+        <Stack.Screen name="ActivityFeed" component={ActivityFeedScreen} options={{ title: 'Buddy activity' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

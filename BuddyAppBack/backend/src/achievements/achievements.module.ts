@@ -12,5 +12,6 @@ import { AchievementsService } from './achievements.service';
   imports: [TypeOrmModule.forFeature([Dive, DiveBuddy, DiveSighting, AchievementState, AchievementPin])],
   controllers: [AchievementsController],
   providers: [AchievementsService],
+  exports: [AchievementsService],
 })
 export class AchievementsModule {}

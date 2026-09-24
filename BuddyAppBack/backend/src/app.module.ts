@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { DivesModule } from './dives/dives.module';
 import { EquipmentModule } from './equipment/equipment.module';
 import { AchievementsModule } from './achievements/achievements.module';
+import { ActivityFeedModule } from './activity-feed/activity-feed.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AchievementsModule } from './achievements/achievements.module';
     DivesModule,
     EquipmentModule,
     AchievementsModule,
+    ActivityFeedModule,
   ],
   controllers: [AppController],
   providers: [],

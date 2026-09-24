@@ -245,6 +245,16 @@ export default function ProfileScreen({ route, navigation }: any) {
             <Text style={styles.achievementsButtonText}>View achievements</Text>
           </TouchableOpacity>
         ) : null}
+
+        {isOwnProfile ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={styles.activityButton}
+            onPress={() => navigation.navigate('ActivityFeed')}
+          >
+            <Text style={styles.activityButtonText}>Open buddy activity</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -482,6 +492,22 @@ const styles = StyleSheet.create({
 
   achievementsButtonText: {
     color: '#9a741b',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+
+  activityButton: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#0077CC',
+    padding: 14,
+    borderRadius: 30,
+    alignItems: 'center',
+    backgroundColor: '#eef7ff',
+  },
+
+  activityButtonText: {
+    color: '#0077CC',
     fontWeight: 'bold',
     fontSize: 15,
   },

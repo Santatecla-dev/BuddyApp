@@ -28,6 +28,34 @@ export interface DiveInvite {
   status: string;
 }
 
+export type ActivityFeedType = 'dive' | 'sighting' | 'achievement';
+
+export interface ActivityFeedBuddy {
+  id: number;
+  name: string;
+}
+
+export interface ActivityFeedItem {
+  id: string;
+  type: ActivityFeedType;
+  createdAt: string;
+  actor: { id: number; name: string };
+  dive?: { id: number; location: string; country: string; date: string; maxDepth: number; duration: number };
+  species?: { key: string; name: string; category: string; imageUrl: string };
+  achievement?: { id: string; title: string; description: string; icon: string; tier: string; category: string; evidence: string[] };
+  commentsPreview?: ActivityFeedComment[];
+  reactionsCount: number;
+  commentsCount: number;
+  reactedByMe: boolean;
+}
+
+export interface ActivityFeedComment {
+  id: number;
+  body: string;
+  createdAt: string;
+  user: { id: number; name: string };
+}
+
 export type PlannedDiveStatus = 'upcoming' | 'logged' | 'cancelled';
 
 export interface PlannedDive {
