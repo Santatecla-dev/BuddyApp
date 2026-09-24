@@ -24,6 +24,7 @@ type FeedItem = {
   reactionsCount: number;
   commentsCount: number;
   reactedByMe: boolean;
+  canOpenDive?: boolean;
 };
 
 @Injectable()
@@ -61,7 +62,7 @@ export class ActivityFeedService {
   }
 
   private async ensureActivityAccess(activityId: string, userId: number) {
-    const match = /^(dive|sighting)-(\d+)$/.exec(activityId);
+    const match = /^(dive|sighting)-(\d+)(?:-(\d+))?$/.exec(activityId);
     const achievementMatch = /^achievement-(\d+)-(.+)$/.exec(activityId);
     if (achievementMatch) {
       const networkUserIds = await this.getNetworkUserIds(userId);
@@ -69,11 +70,20 @@ export class ActivityFeedService {
       return 0;
     }
     if (!match) throw new BadRequestException('Invalid activity');
+    if (match[1] === 'dive' && match[3]) throw new BadRequestException('Invalid activity');
     let diveId = Number(match[2]);
     if (match[1] === 'sighting') {
       const sighting = await this.sightingRepo.findOne({ where: { id: diveId } });
       if (!sighting) throw new NotFoundException('Activity not found');
       diveId = sighting.diveId;
+      if (match[3]) {
+        const actorId = Number(match[3]);
+        const network = await this.getNetworkUserIds(userId);
+        const membership = await this.buddyRepo.findOne({ where: { diveId, userId: actorId } });
+        if (!network.includes(actorId) || !membership || actorId === sighting.createdByUserId) {
+          throw new ForbiddenException('You cannot interact with this activity');
+        }
+      }
     }
     const visibleDiveIds = await this.getVisibleDiveIds(userId);
     if (!visibleDiveIds.includes(diveId)) throw new ForbiddenException('You cannot interact with this activity');
@@ -85,7 +95,7 @@ export class ActivityFeedService {
     const activityType = isMine ? mineType : type;
     const networkUserIds = isMine ? [userId] : await this.getNetworkUserIds(userId);
     const selectedBuddyId = buddyId && networkUserIds.includes(buddyId) && buddyId !== userId ? buddyId : undefined;
-    const ownMemberships = isMine ? await this.buddyRepo.find({ where: { userId } }) : [];
+    const ownMemberships = await this.buddyRepo.find({ where: { userId } });
     const ownDiveIds = ownMemberships.map((membership) => membership.diveId);
     const diveIds = isMine ? [...new Set(ownDiveIds)] : await this.getVisibleDiveIds(userId);
     let dives: Dive[] = [];
@@ -126,11 +136,17 @@ export class ActivityFeedService {
     if (activityType === 'all' || activityType === 'wildlife') {
       sightings.forEach((sighting) => {
         const dive = diveMap.get(sighting.diveId);
-        const actor = (isMine ? userMap.get(userId) : userMap.get(sighting.createdByUserId))
-          || userMap.get((buddiesByDive.get(sighting.diveId) || []).find((buddy) => buddy.userId !== userId)?.userId || 0);
         const species = getSpecies(sighting.speciesKey);
-        const belongsInFeed = isMine ? sighting.createdByUserId === userId : actor?.id !== userId;
-        if (dive && actor && belongsInFeed && (!selectedBuddyId || actor.id === selectedBuddyId) && species) items.push({ id: `sighting-${sighting.id}`, type: 'sighting', createdAt: sighting.createdAt, actor: { id: actor.id, name: actor.name }, dive: { id: dive.id, location: dive.location, country: dive.country, date: dive.date, maxDepth: dive.maxDepth, duration: dive.duration }, species, reactionsCount: 0, commentsCount: 0, reactedByMe: false, commentsPreview: [] });
+        if (!dive || !species) return;
+        // Sightings belong to every accepted dive participant, as in the Pokedex.
+        // Keep the author's legacy event ID so existing conversations survive.
+        const participants = new Map((buddiesByDive.get(dive.id) || []).map((buddy) => [buddy.userId, buddy]));
+        participants.forEach((membership, actorId) => {
+          const actor = userMap.get(actorId);
+          if (!actor || !networkUserIds.includes(actorId) || (isMine ? actorId !== userId : actorId === userId) || (selectedBuddyId && actorId !== selectedBuddyId)) return;
+          const isAuthor = actorId === sighting.createdByUserId;
+          items.push({ id: isAuthor ? `sighting-${sighting.id}` : `sighting-${sighting.id}-${actorId}`, type: 'sighting', createdAt: new Date(Math.max(sighting.createdAt.getTime(), membership.joinedAt.getTime())), actor: { id: actor.id, name: actor.name }, dive: { id: dive.id, location: dive.location, country: dive.country, date: dive.date, maxDepth: dive.maxDepth, duration: dive.duration }, species, reactionsCount: 0, commentsCount: 0, reactedByMe: false, commentsPreview: [] });
+        });
       });
     }
     if (activityType === 'all' || activityType === 'achievements') {
@@ -170,6 +186,7 @@ export class ActivityFeedService {
     const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 30);
     const offset = Math.max(Number(cursor) || 0, 0);
     const page = items.slice(offset, offset + safeLimit);
+    page.forEach((item) => { if (item.dive) item.canOpenDive = ownDiveIds.includes(item.dive.id); });
     const pageIds = page.map((item) => item.id);
     const [reactions, comments] = pageIds.length ? await Promise.all([
       this.reactionRepo.find({ where: { activityId: In(pageIds) } }),

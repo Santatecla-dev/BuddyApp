@@ -47,6 +47,7 @@ export interface ActivityFeedItem {
   reactionsCount: number;
   commentsCount: number;
   reactedByMe: boolean;
+  canOpenDive?: boolean;
 }
 
 export interface ActivityFeedComment {
