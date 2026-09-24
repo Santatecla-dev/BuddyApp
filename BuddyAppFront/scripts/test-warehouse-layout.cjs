@@ -1,0 +1,36 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const ts = require('typescript');
+const source = fs.readFileSync(require('node:path').join(__dirname, '../src/utils/warehouseLayout.ts'), 'utf8');
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+const loaded = { exports: {} };
+new Function('exports', 'require', 'module', compiled)(loaded.exports, require, loaded);
+const { placementError, findPlacement, fitsMap, rotatedFootprint, isStorage } = loaded.exports;
+const map = { width: 12, height: 10 };
+const rack = { id: 1, label: 'Rack', x: 0, y: 0, width: 4, height: 2, rotation: 0 };
+assert.equal(placementError({ ...rack, id: 2, x: 4 }, map, [rack]), '');
+assert.match(placementError({ ...rack, id: 2, x: 3 }, map, [rack]), /overlap/);
+assert.match(placementError({ ...rack, width: 13 }, map, []), /boundaries/);
+assert.match(placementError({ ...rack, x: -1 }, map, []), /boundaries/);
+assert.equal(placementError(rack, map, [rack]), '');
+const neighbor = { ...rack, id: 2, x: 4 };
+assert.match(placementError({ ...rack, width: 5 }, map, [neighbor]), /overlap/);
+assert.match(placementError({ ...rack, rotation: 45 }, map, [neighbor]), /overlap/);
+assert.equal(placementError({ ...rack, rotation: 90 }, map, [neighbor]), '');
+assert.equal(fitsMap({ ...rack, x: 8, rotation: 45 }, map), false);
+assert.equal(findPlacement({ width: 13, height: 2 }, map, []), null);
+assert.equal(findPlacement(map, map, [rack]), null);
+assert.deepEqual(findPlacement({ width: 4, height: 2 }, map, [rack]), { x: 4, y: 0, width: 4, height: 2, rotation: 0 });
+for (const rotation of [0, 45, 90, 135, 180, 225, 270, 315]) {
+  const shape = { ...rack, rotation };
+  const bounds = rotatedFootprint(shape);
+  const rad = rotation * Math.PI / 180;
+  const actualWidth = Math.abs(4 * Math.cos(rad)) + Math.abs(2 * Math.sin(rad));
+  const actualHeight = Math.abs(4 * Math.sin(rad)) + Math.abs(2 * Math.cos(rad));
+  assert(bounds.width + 1e-9 >= actualWidth && bounds.height + 1e-9 >= actualHeight);
+  assert(fitsMap(shape, bounds));
+  assert(!fitsMap(shape, { ...bounds, width: bounds.width - 1 }));
+}
+assert(isStorage('rack') && isStorage('shelf') && isStorage('workbench'));
+assert(!isStorage('zone') && !isStorage('compressor'));
+console.log('Warehouse layout: placement, adjacency, resizing, all rotations, bounds, full maps and storage eligibility passed.');
