@@ -1,4 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { DiveCenter } from '../centers/dive-center.entity';
+import { JoinColumn, ManyToOne } from 'typeorm';
 
 export type PlannedDiveStatus = 'upcoming' | 'logged' | 'cancelled';
 
@@ -28,6 +30,10 @@ export class PlannedDive {
 
   @Column()
   buddy: string;
+
+  @ManyToOne(() => DiveCenter, { nullable: true, eager: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'centerId' })
+  center: DiveCenter | null;
 
   @Column()
   condition: string;

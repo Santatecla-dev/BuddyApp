@@ -37,4 +37,8 @@ export class CreateDiveDto {
   @ArrayMaxSize(40)
   @IsString({ each: true })
   sightings?: string[];
+
+  @IsOptional()
+  @IsNumber()
+  centerId?: number;
 }

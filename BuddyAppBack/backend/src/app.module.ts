@@ -8,6 +8,7 @@ import { DivesModule } from './dives/dives.module';
 import { EquipmentModule } from './equipment/equipment.module';
 import { AchievementsModule } from './achievements/achievements.module';
 import { ActivityFeedModule } from './activity-feed/activity-feed.module';
+import { CentersModule } from './centers/centers.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ActivityFeedModule } from './activity-feed/activity-feed.module';
     EquipmentModule,
     AchievementsModule,
     ActivityFeedModule,
+    CentersModule,
   ],
   controllers: [AppController],
   providers: [],

@@ -8,7 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import API from '../api/api';
-import { DiveInvite } from '../types';
+import { DiveInvite, PlannedDiveInvite } from '../types';
 
 type BuddyInviteGroup = {
   key: string;
@@ -19,11 +19,13 @@ type BuddyInviteGroup = {
 export default function InvitationsScreen() {
   const [invites, setInvites] = useState<DiveInvite[]>([]);
   const [groupedByBuddy, setGroupedByBuddy] = useState(false);
+  const [plannedInvites, setPlannedInvites] = useState<PlannedDiveInvite[]>([]);
 
   const fetchInvites = async () => {
     try {
-      const res = await API.get('/dives/invites/pending');
-      setInvites(res.data);
+      const [res, plannedRes] = await Promise.all([API.get('/dives/invites/pending'), API.get('/planned-dives/invites/pending')]);
+      setInvites(Array.isArray(res.data) ? res.data : []);
+      setPlannedInvites(Array.isArray(plannedRes.data) ? plannedRes.data : []);
     } catch (err) {
       console.log(err);
     }
@@ -38,6 +40,10 @@ export default function InvitationsScreen() {
     } catch (err) {
       console.log(err);
     }
+  };
+
+  const respondPlanned = async (inviteId: number, accept: boolean) => {
+    try { await API.post(`/planned-dives/invite/${inviteId}/respond`, { accept }); fetchInvites(); } catch (err) { console.log(err); }
   };
 
   useEffect(() => {
@@ -146,11 +152,12 @@ export default function InvitationsScreen() {
             </Text>
           </TouchableOpacity>
         }
-        ListEmptyComponent={
+        ListEmptyComponent={invites.length || plannedInvites.length ? null :
           <Text style={styles.emptyText}>
             You have no pending invitations 🤿
           </Text>
         }
+        ListFooterComponent={plannedInvites.length ? <View style={styles.plannedSection}><Text style={styles.sectionTitle}>Planned dive invitations</Text>{plannedInvites.map((invite) => <View key={invite.id} style={styles.card}><Text style={styles.title}>{invite.plannedDive.location} · {new Date(invite.plannedDive.date).toLocaleDateString()}</Text><Text style={styles.subtitle}>Planned by: {invite.invitedByUser?.name || 'Dive center'}</Text><View style={styles.actions}><TouchableOpacity style={[styles.button, styles.acceptButton]} onPress={() => respondPlanned(invite.id, true)}><Text style={styles.buttonText}>Accept</Text></TouchableOpacity><TouchableOpacity style={[styles.button, styles.rejectButton]} onPress={() => respondPlanned(invite.id, false)}><Text style={styles.buttonText}>Decline</Text></TouchableOpacity></View></View>)}</View> : null}
       />
     </View>
   );
@@ -297,4 +304,6 @@ const styles = StyleSheet.create({
   groupedInvite: {
     width: '100%',
   },
+  plannedSection: { marginTop: 18 },
+  sectionTitle: { color: '#164c67', fontSize: 19, fontWeight: 'bold', marginBottom: 12 },
 });

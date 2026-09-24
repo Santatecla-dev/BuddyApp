@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -30,6 +30,14 @@ export default function PlannedDiveDetailScreen({ navigation, route }: any) {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [myUserId, setMyUserId] = useState<number | null>(null);
+
+  useEffect(() => {
+    try {
+      const token = API.defaults.headers.common.Authorization;
+      if (typeof token === 'string') setMyUserId(JSON.parse(atob(token.split(' ')[1].split('.')[1])).userId);
+    } catch { setMyUserId(null); }
+  }, []);
 
   const fetchPlan = useCallback(async () => {
     setLoading(true);
@@ -83,6 +91,7 @@ export default function PlannedDiveDetailScreen({ navigation, route }: any) {
 
   const checklist = Object.entries(completeChecklist(plan.checklist));
   const completed = checklist.filter(([, value]) => value).length;
+  const canManage = myUserId === plan.userId;
 
   return (
     <View style={styles.screen}>
@@ -92,6 +101,7 @@ export default function PlannedDiveDetailScreen({ navigation, route }: any) {
           <Text style={styles.title}>{plan.location}</Text>
           <Text style={styles.date}>{formatDate(plan.date)}</Text>
           <Text style={styles.country}>{plan.country} · {plan.buddy}</Text>
+          {plan.center ? <View style={styles.centerBadge}><Text style={styles.centerBadgeLabel}>DIVE CENTER</Text><Text style={styles.centerBadgeName}>{plan.center.name}</Text></View> : null}
         </View>
 
         <View style={styles.metrics}>
@@ -118,7 +128,7 @@ export default function PlannedDiveDetailScreen({ navigation, route }: any) {
         </View>
 
         {actionError ? <Text accessibilityRole="alert" style={styles.error}>{actionError}</Text> : null}
-        {confirmDelete && <View style={styles.panel}>
+        {canManage && confirmDelete && <View style={styles.panel}>
           <Text accessibilityRole="header" style={styles.panelTitle}>Delete planned dive?</Text>
           <Text style={styles.notes}>This removes the plan without creating a logged dive.</Text>
           <View style={styles.actions}>
@@ -126,10 +136,10 @@ export default function PlannedDiveDetailScreen({ navigation, route }: any) {
             <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.deleteButton} onPress={deletePlan}><Text style={styles.deleteButtonText}>Confirm delete</Text></TouchableOpacity>
           </View>
         </View>}
-        <View style={styles.actions}>
+        {canManage ? <View style={styles.actions}>
           <TouchableOpacity accessibilityRole="button" disabled={busy} style={[styles.logButton, busy && styles.disabled]} onPress={logDive}><Text style={styles.logButtonText}>{busy ? 'Working…' : 'Log this dive'}</Text></TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" disabled={busy || confirmDelete} style={styles.deleteButton} onPress={() => setConfirmDelete(true)}><Text style={styles.deleteButtonText}>Delete plan</Text></TouchableOpacity>
-        </View>
+        </View> : <Text style={styles.muted}>You are viewing a shared planned dive. Only its owner can edit, log or delete it.</Text>}
       </ScrollView>
     </View>
   );
@@ -145,6 +155,9 @@ const styles = StyleSheet.create({
   title: { color: '#0077CC', fontSize: 30, fontWeight: 'bold', marginTop: 8 },
   date: { color: '#334155', fontSize: 16, fontWeight: 'bold', marginTop: 8 },
   country: { color: '#637789', fontSize: 14, marginTop: 5 },
+  centerBadge: { alignSelf: 'flex-start', backgroundColor: '#e7f6fb', borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 11, paddingHorizontal: 11, paddingVertical: 7, marginTop: 12 },
+  centerBadgeLabel: { color: '#008d8d', fontSize: 9, fontWeight: 'bold', letterSpacing: 0.8 },
+  centerBadgeName: { color: '#164c67', fontSize: 13, fontWeight: 'bold', marginTop: 2 },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   metric: { flexGrow: 1, flexShrink: 1, flexBasis: 150, minWidth: 0, minHeight: 84, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 15, padding: 15 },
   metricValue: { color: '#0077CC', fontSize: 17, fontWeight: 'bold' },

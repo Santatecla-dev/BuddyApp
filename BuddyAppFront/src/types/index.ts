@@ -2,6 +2,39 @@ export interface User {
   userId: number;
   name: string;
   email: string;
+  accountType?: 'diver' | 'center';
+  centerId?: number | null;
+}
+
+export interface DiveCenter {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  city?: string | null;
+  country?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  legalName?: string | null;
+  taxId?: string | null;
+  address?: string | null;
+  postalCode?: string | null;
+  contactName?: string | null;
+  timezone?: string | null;
+  openingHours?: string | null;
+  instagram?: string | null;
+  facebook?: string | null;
+  verified?: boolean;
+}
+
+export interface CenterProfile {
+  center: DiveCenter;
+  stats: { loggedDives: number; plannedDives: number; clients: number; assetTypes: number; inventoryUnits: number; availableUnits: number };
+  clientsPreview: CenterClient[];
+  clientRanking: CenterClient[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Dive {
@@ -12,6 +45,10 @@ export interface Dive {
   duration: number;
   notes?: string;
   country: string;
+  centerId?: number | null;
+  center?: DiveCenter | null;
+  createdByUserId?: number | null;
+  canEdit?: boolean;
 }
 
 export interface DiveBuddy {
@@ -76,6 +113,53 @@ export interface PlannedDive {
   status: PlannedDiveStatus;
   createdAt: string;
   updatedAt: string;
+  centerId?: number | null;
+  center?: DiveCenter | null;
+}
+
+export type CenterInventoryStatus = 'available' | 'maintenance' | 'retired';
+
+export interface CenterInventoryItem {
+  id: number;
+  centerId: number;
+  name: string;
+  category: string;
+  quantity: number;
+  status: CenterInventoryStatus;
+  location?: string | null;
+  notes?: string | null;
+  nextServiceDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CenterClient {
+  id: number;
+  name: string;
+  email: string;
+  dives: number;
+  lastDive?: string | null;
+}
+
+export interface CenterLinkRequest {
+  id: number;
+  diveId: number;
+  centerId: number;
+  requestedByUserId: number;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  message?: string | null;
+  createdAt: string;
+  dive?: Dive;
+  center?: DiveCenter;
+  requestedBy?: User;
+}
+
+export interface PlannedDiveInvite {
+  id: number;
+  plannedDive: PlannedDive;
+  invitedByUser?: User;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  createdAt: string;
 }
 
 export type DiveTripStatus = 'upcoming' | 'completed' | 'cancelled';

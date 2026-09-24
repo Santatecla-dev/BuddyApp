@@ -1,0 +1,53 @@
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import API from '../api/api';
+import { CenterClient, CenterInventoryItem, CenterLinkRequest, Dive, DiveCenter, PlannedDive } from '../types';
+
+type Dashboard = { center: DiveCenter; dives: Dive[]; plannedDives: PlannedDive[]; inventory: CenterInventoryItem[]; clients: CenterClient[]; linkRequests: CenterLinkRequest[]; counts: { dives: number; plannedDives: number; inventory: number; clients: number } };
+
+const dateLabel = (value: string) => new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+
+export default function CenterDashboardScreen({ navigation }: any) {
+  const [data, setData] = useState<Dashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      const response = await API.get<Dashboard>('/center/dashboard');
+      setData(response.data);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Could not load the center dashboard.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const respond = async (request: CenterLinkRequest, accept: boolean) => {
+    try { await API.patch(`/center/link-requests/${request.id}`, { accept }); await load(); }
+    catch (err: any) { setError(err?.response?.data?.message || 'Could not update this request.'); }
+  };
+  if (loading && !data) return <View style={styles.center}><ActivityIndicator color="#0077CC" /><Text style={styles.loading}>Loading center workspace…</Text></View>;
+  if (!data) return <View style={styles.center}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><TouchableOpacity style={styles.retry} onPress={load}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>;
+
+  return <ScrollView style={styles.screen} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}>
+    <View style={styles.hero}><View style={styles.heroCopy}><Text style={styles.eyebrow}>DIVE CENTER WORKSPACE</Text><Text style={styles.title}>{data.center.name}</Text><Text style={styles.subtitle}>{[data.center.city, data.center.country].filter(Boolean).join(' · ') || 'Complete your public center profile.'}</Text></View><View style={styles.verified}><Text style={styles.verifiedText}>{data.center.verified ? 'Verified' : 'Pending review'}</Text></View></View>
+    {error ? <Text accessibilityRole="alert" style={styles.inlineError}>{error}</Text> : null}
+    <View style={styles.actions}><TouchableOpacity accessibilityRole="button" style={styles.primaryButton} onPress={() => navigation.navigate('CenterLogDive')}><Text style={styles.primaryText}>Log a dive</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" style={styles.primaryButton} onPress={() => navigation.navigate('CenterPlanDive')}><Text style={styles.primaryText}>Plan a dive</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" style={styles.secondaryButton} onPress={() => navigation.navigate('CenterInventory')}><Text style={styles.secondaryText}>Manage inventory</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" style={styles.secondaryButton} onPress={() => navigation.navigate('CenterClients')}><Text style={styles.secondaryText}>View clients</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" style={styles.secondaryButton} onPress={() => navigation.navigate('CenterProfile')}><Text style={styles.secondaryText}>Center profile</Text></TouchableOpacity></View>
+    <View style={styles.metrics}>{[['dives', data.counts.dives, 'Logged dives'], ['planned', data.counts.plannedDives, 'Planned dives'], ['inventory', data.counts.inventory, 'Inventory items'], ['clients', data.counts.clients, 'Clients']].map(([key, value, label]) => <View key={String(key)} style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>)}</View>
+    <View style={styles.columns}>
+      <View style={styles.panel}><View style={styles.panelHeader}><Text style={styles.panelTitle}>Upcoming dives</Text><Text style={styles.panelCount}>{data.plannedDives.length}</Text></View>{data.plannedDives.length ? data.plannedDives.slice(0, 6).map((plan) => <View key={plan.id} style={styles.itemCard}><View style={styles.itemCopy}><Text style={styles.itemTitle}>{plan.location}</Text><Text style={styles.itemMeta}>{plan.country} · {dateLabel(plan.date)} · {plan.duration} min</Text></View><Text style={styles.planBadge}>PLANNED</Text></View>) : <Text style={styles.empty}>No planned dives linked to this center yet.</Text>}</View>
+      <View style={styles.panel}><View style={styles.panelHeader}><Text style={styles.panelTitle}>Recent logged dives</Text><Text style={styles.panelCount}>{data.dives.length}</Text></View>{data.dives.length ? data.dives.slice(0, 6).map((dive) => <View key={dive.id} style={styles.itemCard}><View style={styles.itemCopy}><Text style={styles.itemTitle}>{dive.location}</Text><Text style={styles.itemMeta}>{dive.country} · {dateLabel(dive.date)} · {dive.maxDepth} m</Text></View><Text style={styles.loggedBadge}>LOGGED</Text></View>) : <Text style={styles.empty}>No logged dives have been linked yet.</Text>}</View>
+    </View>
+    <View style={styles.panel}><View style={styles.panelHeader}><Text style={styles.panelTitle}>Center link requests</Text><Text style={styles.panelCount}>{data.linkRequests?.length || 0}</Text></View>{data.linkRequests?.length ? data.linkRequests.map((request) => <View key={request.id} style={styles.requestCard}><View style={styles.itemCopy}><Text style={styles.itemTitle}>{request.dive?.location || `Dive #${request.diveId}`}</Text><Text style={styles.itemMeta}>{request.dive?.country || 'Unknown country'} · {request.dive ? dateLabel(request.dive.date) : 'Date unavailable'}</Text><Text style={styles.requestMessage}>{request.message || 'A diver wants to associate this dive with your center.'}</Text></View><View style={styles.requestActions}><TouchableOpacity accessibilityRole="button" style={styles.acceptButton} onPress={() => respond(request, true)}><Text style={styles.acceptText}>Accept</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" style={styles.rejectButton} onPress={() => respond(request, false)}><Text style={styles.rejectText}>Decline</Text></TouchableOpacity></View></View>) : <Text style={styles.empty}>No pending requests.</Text>}</View>
+  </ScrollView>;
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#f3f6f8' }, content: { width: '100%', maxWidth: 1120, alignSelf: 'center', padding: 20, paddingBottom: 50 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }, loading: { color: '#536b7a', marginTop: 10 }, error: { color: '#b42318', textAlign: 'center' }, retry: { borderWidth: 1, borderColor: '#123b52', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 9, marginTop: 14 }, retryText: { color: '#123b52', fontWeight: 'bold' }, hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14, backgroundColor: '#e1ebee', borderWidth: 1, borderColor: '#b9cdd3', borderRadius: 22, padding: 24 }, heroCopy: { flex: 1, minWidth: 250 }, eyebrow: { color: '#0b777b', fontSize: 11, fontWeight: 'bold', letterSpacing: 1.1 }, title: { color: '#123b52', fontSize: 28, fontWeight: 'bold', marginTop: 5 }, subtitle: { color: '#536b7a', marginTop: 6 }, verified: { backgroundColor: '#fff', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 }, verifiedText: { color: '#176b5d', fontSize: 12, fontWeight: 'bold' }, inlineError: { color: '#b42318', marginTop: 12 }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 }, primaryButton: { backgroundColor: '#123b52', borderRadius: 21, paddingHorizontal: 16, paddingVertical: 11 }, primaryText: { color: '#fff', fontWeight: 'bold' }, secondaryButton: { borderWidth: 1, borderColor: '#0b777b', borderRadius: 21, paddingHorizontal: 16, paddingVertical: 10 }, secondaryText: { color: '#0b777b', fontWeight: 'bold' }, metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 }, metric: { flex: 1, minWidth: 150, backgroundColor: '#fff', borderWidth: 1, borderColor: '#ccdbe0', borderRadius: 15, padding: 15 }, metricValue: { color: '#123b52', fontSize: 23, fontWeight: 'bold' }, metricLabel: { color: '#718394', fontSize: 12, marginTop: 4 }, columns: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 16 }, panel: { flex: 1, flexBasis: 430, minWidth: 280, backgroundColor: '#fff', borderWidth: 1, borderColor: '#ccdbe0', borderRadius: 17, padding: 17, marginTop: 16 }, panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }, panelTitle: { color: '#123b52', fontSize: 18, fontWeight: 'bold' }, panelCount: { color: '#0b777b', fontWeight: 'bold' }, itemCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderWidth: 1, borderColor: '#d6e2e5', borderRadius: 12, padding: 11, marginTop: 8 }, itemCopy: { flex: 1, minWidth: 0 }, itemTitle: { color: '#123b52', fontWeight: 'bold' }, itemMeta: { color: '#718394', fontSize: 11, marginTop: 4 }, planBadge: { color: '#176b5d', backgroundColor: '#e4f2ee', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, fontSize: 10, fontWeight: 'bold' }, loggedBadge: { color: '#24566b', backgroundColor: '#e6eff2', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, fontSize: 10, fontWeight: 'bold' }, empty: { color: '#718394', marginTop: 12 }, requestCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#d6e2e5', borderRadius: 12, padding: 11, marginTop: 8 }, requestMessage: { color: '#718394', fontSize: 11, marginTop: 5 }, requestActions: { gap: 7 }, acceptButton: { backgroundColor: '#e4f2ee', borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7 }, acceptText: { color: '#176b5d', fontSize: 11, fontWeight: 'bold' }, rejectButton: { borderWidth: 1, borderColor: '#f1c3c3', borderRadius: 9, paddingHorizontal: 10, paddingVertical: 6 }, rejectText: { color: '#b42318', fontSize: 11, fontWeight: 'bold' },
+});

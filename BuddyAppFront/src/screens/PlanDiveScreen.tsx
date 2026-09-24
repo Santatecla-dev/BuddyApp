@@ -13,14 +13,19 @@ import API from '../api/api';
 import { COUNTRIES } from './CreateDiveScreen';
 
 import { CHECKLIST, ChecklistItem } from '../utils/plannedDiveChecklist';
+import CenterSearchField from '../components/CenterSearchField';
 
 const CONDITIONS = ['Calm', 'Good', 'Choppy', 'Low visibility'];
 const GAS_OPTIONS = ['Air', 'Nitrox 32', 'Nitrox 36', 'Trimix'];
 
-export default function PlanDiveScreen({ navigation }: any) {
+export default function PlanDiveScreen({ navigation, route }: any) {
+  const isCenterMode = route?.params?.centerMode === true;
+  const styles = isCenterMode ? { ...buddyStyles, ...centerStyles } : buddyStyles;
   const scrollRef = useRef<ScrollView>(null);
   const [country, setCountry] = useState('');
   const [site, setSite] = useState('');
+  const [centerId, setCenterId] = useState('');
+  const [buddyUserIds, setBuddyUserIds] = useState('');
   const [date, setDate] = useState('');
   const [depth, setDepth] = useState('25');
   const [duration, setDuration] = useState('45');
@@ -79,7 +84,8 @@ export default function PlanDiveScreen({ navigation }: any) {
     }
     setSaving(true);
     try {
-      await API.post('/planned-dives', {
+      const endpoint = isCenterMode ? '/planned-dives/center' : '/planned-dives';
+      await API.post(endpoint, {
         date: parsedDate.toISOString(),
         country,
         location: site.trim(),
@@ -91,6 +97,8 @@ export default function PlanDiveScreen({ navigation }: any) {
         shoreEntry,
         notes: notes.trim() || undefined,
         checklist: Object.fromEntries(CHECKLIST.map(item => [item.id, !!checked[item.id]])),
+        centerId: centerId ? Number(centerId) : undefined,
+        buddyUserIds: isCenterMode ? buddyUserIds.split(',').map((value) => Number(value.trim())).filter((value) => Number.isInteger(value) && value > 0) : undefined,
       });
       setSaved(true);
       navigation.navigate('PlannedDives');
@@ -150,6 +158,7 @@ export default function PlanDiveScreen({ navigation }: any) {
               style={[styles.input, !!fieldErrors.site && styles.invalidInput]}
             />
             {fieldErrors.site && <Text style={styles.saveErrorText}>{fieldErrors.site}</Text>}
+            {!isCenterMode ? <CenterSearchField selectedCenterId={centerId} onSelect={(center) => setCenterId(center ? String(center.id) : '')} label="Dive center (optional)" /> : null}
             <View style={styles.twoFields}>
               <View style={styles.fieldHalf}>
                 <Text style={styles.label}>Date</Text>
@@ -173,6 +182,7 @@ export default function PlanDiveScreen({ navigation }: any) {
                 />
               </View>
             </View>
+            {isCenterMode ? <><Text style={styles.label}>Buddy user IDs</Text><TextInput accessibilityLabel="Buddy user IDs" placeholder="12, 24, 31" value={buddyUserIds} onChangeText={setBuddyUserIds} style={styles.input} /><Text style={styles.hint}>Each diver receives an invitation to this center-planned dive.</Text></> : null}
             <View style={styles.twoFields}>
               <View style={styles.fieldHalf}>
                 <Text style={styles.label}>Max depth (m)</Text>
@@ -238,8 +248,8 @@ export default function PlanDiveScreen({ navigation }: any) {
                 accessibilityLabel="Shore entry"
                 value={shoreEntry}
                 onValueChange={setShoreEntry}
-                trackColor={{ false: '#cbd5e1', true: '#8ed6d1' }}
-                thumbColor={shoreEntry ? '#00A8A8' : '#f8fafc'}
+                trackColor={{ false: '#cbd5e1', true: isCenterMode ? '#789aa6' : '#8ed6d1' }}
+                thumbColor={shoreEntry ? (isCenterMode ? '#123b52' : '#00A8A8') : '#f8fafc'}
               />
             </View>
             <View style={styles.noticeRow}>
@@ -310,7 +320,7 @@ export default function PlanDiveScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const buddyStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f7f9fc', overflow: 'hidden' },
   container: { flex: 1 },
   content: { width: '100%', maxWidth: 1120, alignSelf: 'center', padding: 20, paddingBottom: 28 },
@@ -328,6 +338,7 @@ const styles = StyleSheet.create({
   panelTitle: { color: '#1e293b', fontSize: 19, fontWeight: 'bold', marginBottom: 5 },
   panelSubtitle: { color: '#6b7c8d', fontSize: 13, marginBottom: 16 },
   label: { color: '#334155', fontSize: 13, fontWeight: 'bold', marginTop: 14, marginBottom: 7 },
+  hint: { color: '#718394', fontSize: 11, marginTop: 5 },
   input: { width: '100%', minWidth: 0, minHeight: 48, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 13, paddingVertical: 11, color: '#334155', fontSize: 15 },
   pickerWrap: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 14, backgroundColor: '#fff', overflow: 'hidden' },
   picker: { height: 48, width: '100%', color: '#334155', backgroundColor: '#fff' },
@@ -374,4 +385,32 @@ const styles = StyleSheet.create({
   saveButtonText: { color: '#fff', fontWeight: 'bold' },
   logButton: { borderWidth: 1, borderColor: '#00A8A8', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, minWidth: 120, alignItems: 'center' },
   logButtonText: { color: '#008d8d', fontWeight: 'bold' },
+});
+
+const centerStyles = StyleSheet.create({
+  screen: { backgroundColor: '#f3f6f8' },
+  hero: { backgroundColor: '#e1ebee', borderColor: '#b9cdd3' },
+  eyebrow: { color: '#0b777b' },
+  title: { color: '#123b52' },
+  progressBadge: { borderColor: '#0b777b' },
+  progressValue: { color: '#123b52' },
+  panel: { borderColor: '#ccdbe0' },
+  panelTitle: { color: '#123b52' },
+  label: { color: '#123b52' },
+  input: { borderColor: '#aabfc7' },
+  pickerWrap: { borderColor: '#aabfc7' },
+  chip: { borderColor: '#aabfc7' },
+  chipActive: { backgroundColor: '#123b52', borderColor: '#123b52' },
+  chipText: { color: '#123b52' },
+  gasOption: { borderColor: '#c3d5da', backgroundColor: '#f5f8f9' },
+  gasOptionActive: { backgroundColor: '#e4f2ee', borderColor: '#0b777b' },
+  gasTextActive: { color: '#0b777b' },
+  checklistCount: { color: '#0b777b' },
+  groupLabel: { color: '#123b52' },
+  checkItemActive: { backgroundColor: '#e4f2ee', borderColor: '#9bc9c1' },
+  checkboxActive: { backgroundColor: '#123b52', borderColor: '#123b52' },
+  saveBar: { borderColor: '#ccdbe0' },
+  saveButton: { backgroundColor: '#123b52' },
+  logButton: { borderColor: '#0b777b' },
+  logButtonText: { color: '#0b777b' },
 });

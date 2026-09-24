@@ -19,6 +19,7 @@ import { RejectInviteDto } from './dto/reject-invite.dto';
 import { ParseIntPipe } from '@nestjs/common';
 import { UpdatePersonalNotesDto } from './dto/update-personal-notes.dto';
 import { UpdateSightingsDto } from './dto/update-sightings.dto';
+import { UpdateDiveDto } from './dto/update-dive.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('dives')
@@ -60,6 +61,12 @@ export class DivesController {
     return this.divesService.getMyDives(req.user.userId);
   }
 
+  @Get(':diveId')
+  getDive(@Param('diveId', ParseIntPipe) diveId: number, @Req() req) { return this.divesService.getDive(diveId, req.user.userId); }
+
+  @Patch(':diveId')
+  updateDive(@Param('diveId', ParseIntPipe) diveId: number, @Body() dto: UpdateDiveDto, @Req() req) { return this.divesService.updateDive(diveId, dto, req.user.userId); }
+
   @Get(':diveId/sightings')
   getSightings(@Param('diveId', ParseIntPipe) diveId: number, @Req() req) {
     return this.divesService.getDiveSightings(diveId, req.user.userId);
@@ -81,6 +88,25 @@ export class DivesController {
   leaveDive(@Param('diveId', ParseIntPipe) diveId: number, @Req() req) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this.divesService.leaveDive(diveId, req.user.userId);
+  }
+
+  @Patch(':diveId/center')
+  linkCenter(@Param('diveId', ParseIntPipe) diveId: number, @Body() body: { centerId?: number | null }, @Req() req) {
+    return this.divesService.linkCenter(diveId, body.centerId ?? null, req.user.userId);
+  }
+
+  @Post(':diveId/center-requests')
+  requestCenterLink(
+    @Param('diveId', ParseIntPipe) diveId: number,
+    @Body() body: { centerId: number; message?: string },
+    @Req() req,
+  ) {
+    return this.divesService.requestCenterLink(diveId, Number(body.centerId), req.user.userId, body.message);
+  }
+
+  @Get(':diveId/center-requests')
+  getCenterLinkRequests(@Param('diveId', ParseIntPipe) diveId: number, @Req() req) {
+    return this.divesService.getCenterLinkRequestsForDive(diveId, req.user.userId);
   }
 
   @Get(':diveId/personal-notes')

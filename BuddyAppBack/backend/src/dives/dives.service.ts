@@ -14,6 +14,9 @@ import { DiveInvite, InviteStatus } from './dive-invite.entity';
 import { DiveSighting } from './dive-sighting.entity';
 import { AddSightingsToDivesDto } from './dto/update-sightings.dto';
 import { getSpecies, POKEDEX_SPECIES } from './pokedex.catalog';
+import { DiveCenter } from '../centers/dive-center.entity';
+import { CenterLinkRequest, CenterLinkRequestStatus } from '../centers/center-link-request.entity';
+import { UpdateDiveDto } from './dto/update-dive.dto';
 
 @Injectable()
 export class DivesService {
@@ -30,7 +33,20 @@ export class DivesService {
 
     @InjectRepository(DiveSighting)
     private diveSightingRepo: Repository<DiveSighting>,
+
+    @InjectRepository(DiveCenter)
+    private diveCenterRepo: Repository<DiveCenter>,
+
+    @InjectRepository(CenterLinkRequest)
+    private centerLinkRequestRepo: Repository<CenterLinkRequest>,
   ) {}
+
+  private async resolveCenter(centerId?: number) {
+    if (!centerId) return null;
+    const center = await this.diveCenterRepo.findOne({ where: { id: centerId } });
+    if (!center) throw new NotFoundException('Dive center not found');
+    return center;
+  }
 
   async createDive(dto: CreateDiveDto, creatorUserId: number) {
     // 1️⃣ Crear la inmersión (única)
@@ -41,6 +57,10 @@ export class DivesService {
       maxDepth: dto.maxDepth,
       duration: dto.duration,
       notes: dto.notes,
+      // A diver's selected center is a request, not an immediate association.
+      // This keeps the center in control of accepting visits linked to its account.
+      center: null,
+      createdByUserId: creatorUserId,
     });
 
     const savedDive = await this.diveRepo.save(dive);
@@ -55,6 +75,10 @@ export class DivesService {
 
     if (dto.sightings?.length) {
       await this.updateDiveSightings(savedDive.id, dto.sightings, creatorUserId);
+    }
+
+    if (dto.centerId) {
+      await this.requestCenterLink(savedDive.id, dto.centerId, creatorUserId);
     }
 
     return savedDive;
@@ -89,7 +113,7 @@ export class DivesService {
   }
 
   async getDiveSightings(diveId: number, userId: number) {
-    await this.ensureDiveMember(diveId, userId);
+    await this.ensureDiveAccess(diveId, userId);
     const sightings = await this.diveSightingRepo.find({ where: { diveId }, order: { createdAt: 'ASC' } });
     return sightings
       .map((sighting) => getSpecies(sighting.speciesKey))
@@ -97,7 +121,7 @@ export class DivesService {
   }
 
   async updateDiveSightings(diveId: number, speciesKeys: string[], userId: number) {
-    await this.ensureDiveMember(diveId, userId);
+    await this.ensureDiveAccess(diveId, userId);
     const requested = [...new Set(speciesKeys)].filter((key) => Boolean(getSpecies(key)));
     const existing = await this.diveSightingRepo.find({ where: { diveId } });
     const keep = new Set(requested);
@@ -290,6 +314,91 @@ export class DivesService {
     await this.diveBuddyRepo.remove(dive.buddies[buddyIndex]);
 
     return { message: 'Has salido de la inmersión' };
+  }
+
+  private async ensureDiveAccess(diveId: number, userId: number) {
+    const membership = await this.diveBuddyRepo.findOne({ where: { diveId, userId } });
+    if (membership) return;
+    const dive = await this.diveRepo.findOne({ where: { id: diveId } });
+    if (dive?.center) {
+      const center = await this.diveCenterRepo.findOne({ where: { id: dive.center.id, ownerUserId: userId } });
+      if (center) return;
+    }
+    throw new ForbiddenException('You do not have access to this dive');
+  }
+
+  private async canEditDive(dive: Dive, userId: number) {
+    if (dive.createdByUserId === userId) return true;
+    if (dive.createdByUserId !== null) return false;
+    const firstBuddy = await this.diveBuddyRepo.findOne({ where: { diveId: dive.id }, order: { joinedAt: 'ASC' } });
+    return firstBuddy?.userId === userId;
+  }
+
+  async getDive(diveId: number, userId: number) {
+    await this.ensureDiveAccess(diveId, userId);
+    const dive = await this.diveRepo.findOne({ where: { id: diveId } });
+    if (!dive) throw new NotFoundException('Dive not found');
+    return { ...dive, canEdit: await this.canEditDive(dive, userId) };
+  }
+
+  async updateDive(diveId: number, dto: UpdateDiveDto, userId: number) {
+    const dive = await this.diveRepo.findOne({ where: { id: diveId } });
+    if (!dive) throw new NotFoundException('Dive not found');
+    if (!(await this.canEditDive(dive, userId))) throw new ForbiddenException('Only the dive creator can edit it');
+    Object.assign(dive, dto, dto.date ? { date: new Date(dto.date) } : {}, dto.location !== undefined ? { location: dto.location.trim() } : {}, dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {});
+    const saved = await this.diveRepo.save(dive);
+    return { ...saved, canEdit: true };
+  }
+
+  async linkCenter(diveId: number, centerId: number | null, userId: number) {
+    await this.ensureDiveAccess(diveId, userId);
+    const dive = await this.diveRepo.findOne({ where: { id: diveId } });
+    if (!dive) throw new NotFoundException('Dive not found');
+    const center = centerId ? await this.resolveCenter(centerId) : null;
+    if (center && center.ownerUserId !== userId) throw new ForbiddenException('The dive center must accept a link request before this dive is linked');
+    dive.center = center;
+    return this.diveRepo.save(dive);
+  }
+
+  async requestCenterLink(diveId: number, centerId: number, userId: number, message?: string) {
+    await this.ensureDiveAccess(diveId, userId);
+    const center = await this.resolveCenter(centerId);
+    if (!center) throw new NotFoundException('Dive center not found');
+    const dive = await this.diveRepo.findOne({ where: { id: diveId } });
+    if (!dive) throw new NotFoundException('Dive not found');
+    if (dive.center?.id === center.id) throw new BadRequestException('This dive is already linked to this center');
+    if (dive.center && dive.center.id !== center.id) throw new BadRequestException('This dive is already linked to another center');
+    const pending = await this.centerLinkRequestRepo.findOne({
+      where: { diveId, centerId, status: CenterLinkRequestStatus.PENDING },
+    });
+    if (pending) throw new BadRequestException('A center link request is already pending');
+    const request = this.centerLinkRequestRepo.create({
+      diveId,
+      centerId: center.id,
+      requestedByUserId: userId,
+      message: message?.trim() || null,
+      status: CenterLinkRequestStatus.PENDING,
+    });
+    return this.centerLinkRequestRepo.save(request);
+  }
+
+  async getCenterLinkRequestsForDive(diveId: number, userId: number) {
+    await this.ensureDiveAccess(diveId, userId);
+    const requests = await this.centerLinkRequestRepo.find({
+      where: { diveId },
+      relations: ['center'],
+      order: { createdAt: 'DESC' },
+    });
+    return requests.map((request) => ({
+      id: request.id,
+      diveId: request.diveId,
+      centerId: request.centerId,
+      requestedByUserId: request.requestedByUserId,
+      status: request.status,
+      message: request.message,
+      createdAt: request.createdAt,
+      center: request.center,
+    }));
   }
 
   async getDiveBuddies(diveId: number) {

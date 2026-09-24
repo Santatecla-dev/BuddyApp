@@ -5,6 +5,8 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 
+export type UserAccountType = 'diver' | 'center';
+
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()
@@ -18,6 +20,9 @@ export class User {
 
   @Column()
   passwordHash: string;
+
+  @Column({ type: 'varchar', default: 'diver' })
+  accountType: UserAccountType;
 
   // 🆕 Agencia (opcional)
   @Column({ type: 'text', nullable: true })

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,14 @@ import {
   Alert,
   Pressable,
   ScrollView,
-  useWindowDimensions,
+  Modal,
 } from 'react-native';
 import API from '../api/api';
-import { DiveBuddy, Dive, PokedexSpecies } from '../types';
+import { DiveBuddy, Dive, CenterLinkRequest, PokedexSpecies } from '../types';
+import CenterSearchField from '../components/CenterSearchField';
 
 export default function DiveDetailScreen({ route, navigation }: any) {
   const { diveId } = route.params;
-  const { width } = useWindowDimensions();
-  const compactLayout = width < 620;
 
   const [dive, setDive] = useState<Dive | null>(null);
   const [buddies, setBuddies] = useState<DiveBuddy[]>([]);
@@ -28,24 +27,29 @@ export default function DiveDetailScreen({ route, navigation }: any) {
   const [loadError, setLoadError] = useState('');
   const [speciesCatalog, setSpeciesCatalog] = useState<PokedexSpecies[]>([]);
   const [sightings, setSightings] = useState<string[]>([]);
+  const [sightingQuery, setSightingQuery] = useState('');
   const [savingSightings, setSavingSightings] = useState(false);
+  const [centerRequests, setCenterRequests] = useState<CenterLinkRequest[]>([]);
+  const [selectedCenterId, setSelectedCenterId] = useState('');
+  const [requestingCenter, setRequestingCenter] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ location: '', date: '', maxDepth: '', duration: '', notes: '' });
+  const [savingDive, setSavingDive] = useState(false);
 
   const fetchDive = async () => {
     setLoadError('');
     try {
-      const res = await API.get(`/dives/my`);
-      const myDive = res.data.find((d: Dive) => d.id === diveId);
-      if (!myDive) {
-        setLoadError('You did not participate in this dive.');
-        return;
-      }
-      setDive(myDive);
+      const res = await API.get<Dive>(`/dives/${diveId}`);
+      setDive(res.data);
 
       const buddiesRes = await API.get(`/dives/${diveId}/buddies`);
       setBuddies(buddiesRes.data);
 
       const sightingsRes = await API.get(`/dives/${diveId}/sightings`);
       setSightings(sightingsRes.data.map((item: PokedexSpecies) => item.key));
+
+      const requestsRes = await API.get<CenterLinkRequest[]>(`/dives/${diveId}/center-requests`);
+      setCenterRequests(Array.isArray(requestsRes.data) ? requestsRes.data : []);
 
       try {
         const notesRes = await API.get(`/dives/${diveId}/personal-notes`);
@@ -73,6 +77,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
     setDive(null);
     setBuddies([]);
     setMyNotes('');
+    setSightingQuery('');
     fetchDive();
     extractMyUserId();
   }, [diveId]);
@@ -81,11 +86,32 @@ export default function DiveDetailScreen({ route, navigation }: any) {
     API.get('/pokedex/species').then((response) => setSpeciesCatalog(response.data)).catch(() => setSpeciesCatalog([]));
   }, []);
 
+  const requestCenter = async () => {
+    if (!selectedCenterId) return;
+    try {
+      setRequestingCenter(true);
+      const response = await API.post<CenterLinkRequest>(`/dives/${diveId}/center-requests`, { centerId: Number(selectedCenterId) });
+      setCenterRequests((current) => [response.data, ...current]);
+      setSelectedCenterId('');
+      if (Platform.OS === 'web') window.alert('Request sent. The dive center must accept it before this dive is linked.');
+      else Alert.alert('Request sent', 'The dive center must accept it before this dive is linked.');
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Could not send the center request.';
+      if (Platform.OS === 'web') window.alert(message); else Alert.alert('Error', message);
+    } finally { setRequestingCenter(false); }
+  };
+
   const toggleSighting = (speciesKey: string) => {
     setSightings((current) => current.includes(speciesKey)
       ? current.filter((key) => key !== speciesKey)
       : [...current, speciesKey]);
   };
+
+  const filteredSpecies = useMemo(() => {
+    const query = sightingQuery.trim().toLocaleLowerCase();
+    if (!query) return speciesCatalog;
+    return speciesCatalog.filter((species) => `${species.name} ${species.category}`.toLocaleLowerCase().includes(query));
+  }, [sightingQuery, speciesCatalog]);
 
   const saveSightings = async () => {
     try {
@@ -115,6 +141,25 @@ export default function DiveDetailScreen({ route, navigation }: any) {
     } finally {
       setSavingNotes(false);
     }
+  };
+
+  const openEdit = () => {
+    if (!dive) return;
+    setEditForm({ location: dive.location, date: dive.date.slice(0, 16), maxDepth: String(dive.maxDepth), duration: String(dive.duration), notes: dive.notes || '' });
+    setEditModal(true);
+  };
+
+  const saveDive = async () => {
+    if (!dive || !editForm.location.trim()) return;
+    setSavingDive(true);
+    try {
+      const response = await API.patch<Dive>(`/dives/${dive.id}`, { location: editForm.location.trim(), date: new Date(editForm.date).toISOString(), maxDepth: Number(editForm.maxDepth), duration: Number(editForm.duration), notes: editForm.notes.trim() || null });
+      setDive((current) => current ? { ...current, ...response.data } : response.data);
+      setEditModal(false);
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Could not save dive changes.';
+      if (Platform.OS === 'web') window.alert(message); else Alert.alert('Error', message);
+    } finally { setSavingDive(false); }
   };
 
   const confirmLeaveDive = () => {
@@ -169,9 +214,7 @@ export default function DiveDetailScreen({ route, navigation }: any) {
         <View style={styles.cardHeader}>
           <Text style={styles.title}>{dive.location}</Text>
 
-          <Pressable onPress={confirmLeaveDive}>
-            <Text style={styles.leaveText}>Leave</Text>
-          </Pressable>
+          <View style={styles.headerActions}>{dive.canEdit ? <Pressable onPress={openEdit}><Text style={styles.editText}>Edit</Text></Pressable> : null}<Pressable onPress={confirmLeaveDive}><Text style={styles.leaveText}>Leave</Text></Pressable></View>
         </View>
 
         <Text style={styles.date}>
@@ -181,6 +224,16 @@ export default function DiveDetailScreen({ route, navigation }: any) {
             minute: '2-digit',
           })}
         </Text>
+
+        {dive.center ? <View style={styles.centerBadge}><Text style={styles.centerBadgeLabel}>DIVE CENTER</Text><Text style={styles.centerBadgeName}>{dive.center.name}</Text></View> : null}
+
+        {!dive.center ? <View style={styles.centerRequestBox}>
+          <Text style={styles.centerRequestTitle}>Link this dive to a dive center</Text>
+          <Text style={styles.centerRequestHint}>The center will review and accept your request before it appears on the dive.</Text>
+          <CenterSearchField selectedCenterId={selectedCenterId} onSelect={(center) => setSelectedCenterId(center ? String(center.id) : '')} label="Dive center" hint="Search for the center that operated this dive." />
+          <TouchableOpacity accessibilityRole="button" disabled={!selectedCenterId || requestingCenter} style={[styles.requestCenterButton, (!selectedCenterId || requestingCenter) && styles.requestDisabled]} onPress={requestCenter}><Text style={styles.requestCenterText}>{requestingCenter ? 'Sending…' : 'Request center link'}</Text></TouchableOpacity>
+          {centerRequests.filter((request) => request.status === 'PENDING').map((request) => <Text key={request.id} style={styles.pendingCenterText}>Request pending for {request.center?.name || 'selected center'}</Text>)}
+        </View> : null}
 
         <View style={styles.statsRow}>
           <View style={[styles.statBox, styles.shadow]}>
@@ -229,8 +282,20 @@ export default function DiveDetailScreen({ route, navigation }: any) {
           </View>
           <Text style={styles.sightingCount}>{sightings.length}</Text>
         </View>
-        <View style={[styles.sightingGrid, compactLayout && styles.compactSightingGrid]}>
-          {speciesCatalog.map((species) => {
+        <View style={styles.sightingSearchRow}>
+          <TextInput
+            accessibilityLabel="Search marine life"
+            value={sightingQuery}
+            onChangeText={setSightingQuery}
+            placeholder="Search species or category"
+            placeholderTextColor="#7890a0"
+            style={styles.sightingSearchInput}
+          />
+          {sightingQuery ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Clear marine life search" style={styles.sightingClearButton} onPress={() => setSightingQuery('')}><Text style={styles.sightingClearText}>×</Text></TouchableOpacity> : null}
+        </View>
+        <Text style={styles.sightingResultHint}>{filteredSpecies.length} species{filteredSpecies.length === 1 ? '' : 's'} shown · {sightings.length} selected</Text>
+        <ScrollView style={styles.sightingList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+          {filteredSpecies.map((species) => {
             const selected = sightings.includes(species.key);
             return (
               <TouchableOpacity
@@ -238,13 +303,15 @@ export default function DiveDetailScreen({ route, navigation }: any) {
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: selected }}
                 onPress={() => toggleSighting(species.key)}
-                style={[styles.sightingOption, selected && styles.sightingOptionSelected]}
+                style={[styles.sightingListItem, selected && styles.sightingListItemSelected]}
               >
-                <Text numberOfLines={2} style={[styles.sightingName, selected && styles.sightingNameSelected]}>{species.name}</Text>
+                <View style={[styles.sightingCheckbox, selected && styles.sightingCheckboxSelected]}><Text style={styles.sightingCheckboxText}>{selected ? '✓' : ''}</Text></View>
+                <View style={styles.sightingListCopy}><Text numberOfLines={1} style={[styles.sightingListName, selected && styles.sightingNameSelected]}>{species.name}</Text><Text style={styles.sightingListCategory}>{species.category}</Text></View>
               </TouchableOpacity>
             );
           })}
-        </View>
+          {!filteredSpecies.length ? <View style={styles.sightingEmpty}><Text style={styles.sightingEmptyTitle}>No species found</Text><Text style={styles.sightingEmptyText}>Try a different name or category.</Text></View> : null}
+        </ScrollView>
         <TouchableOpacity accessibilityRole="button" disabled={savingSightings} style={styles.saveSightingsButton} onPress={saveSightings}>
           <Text style={styles.saveButtonText}>{savingSightings ? 'Saving…' : 'Save sightings'}</Text>
         </TouchableOpacity>
@@ -283,11 +350,13 @@ export default function DiveDetailScreen({ route, navigation }: any) {
           No buddies in this dive yet 🤿
         </Text>
       )}
+      {dive.canEdit ? <Modal visible={editModal} transparent animationType="slide" onRequestClose={() => setEditModal(false)}><View style={styles.editBackdrop}><View style={styles.editCard}><Text style={styles.editTitle}>Edit dive</Text><Text style={styles.editLabel}>Dive site</Text><TextInput accessibilityLabel="Dive site" value={editForm.location} onChangeText={(value) => setEditForm((current) => ({ ...current, location: value }))} style={styles.editInput} /><Text style={styles.editLabel}>Date and time</Text><TextInput accessibilityLabel="Dive date" value={editForm.date} onChangeText={(value) => setEditForm((current) => ({ ...current, date: value }))} placeholder="YYYY-MM-DDTHH:MM" style={styles.editInput} /><View style={styles.editRow}><View style={styles.editHalf}><Text style={styles.editLabel}>Max depth</Text><TextInput accessibilityLabel="Maximum depth" keyboardType="numeric" value={editForm.maxDepth} onChangeText={(value) => setEditForm((current) => ({ ...current, maxDepth: value }))} style={styles.editInput} /></View><View style={styles.editHalf}><Text style={styles.editLabel}>Duration</Text><TextInput accessibilityLabel="Duration" keyboardType="numeric" value={editForm.duration} onChangeText={(value) => setEditForm((current) => ({ ...current, duration: value }))} style={styles.editInput} /></View></View><Text style={styles.editLabel}>Notes</Text><TextInput accessibilityLabel="Dive notes" multiline value={editForm.notes} onChangeText={(value) => setEditForm((current) => ({ ...current, notes: value }))} style={[styles.editInput, styles.editNotes]} /><View style={styles.editActions}><TouchableOpacity accessibilityRole="button" onPress={() => setEditModal(false)} style={styles.cancelEdit}><Text style={styles.cancelEditText}>Cancel</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" disabled={savingDive} onPress={saveDive} style={styles.saveEdit}><Text style={styles.saveEditText}>{savingDive ? 'Saving…' : 'Save changes'}</Text></TouchableOpacity></View></View></View></Modal> : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 }, editText: { color: '#0077CC', fontWeight: 'bold' }, editBackdrop: { flex: 1, backgroundColor: 'rgba(8,34,48,.48)', justifyContent: 'center', padding: 18 }, editCard: { width: '100%', maxWidth: 600, maxHeight: '92%', alignSelf: 'center', backgroundColor: '#fff', borderRadius: 20, padding: 20 }, editTitle: { color: '#164c67', fontSize: 22, fontWeight: 'bold' }, editLabel: { color: '#0077CC', fontSize: 12, fontWeight: 'bold', marginTop: 13, marginBottom: 5 }, editInput: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#334155', backgroundColor: '#fff' }, editRow: { flexDirection: 'row', gap: 10 }, editHalf: { flex: 1, minWidth: 0 }, editNotes: { minHeight: 80, textAlignVertical: 'top' }, editActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 20 }, cancelEdit: { padding: 12 }, cancelEditText: { color: '#637789', fontWeight: 'bold' }, saveEdit: { backgroundColor: '#0077CC', borderRadius: 20, paddingHorizontal: 17, paddingVertical: 11 }, saveEditText: { color: '#fff', fontWeight: 'bold' },
   container: { flex: 1, backgroundColor: '#f7f9fc' },
   content: { width: '100%', maxWidth: 1050, alignSelf: 'center', padding: 20, paddingBottom: 40 },
   loading: { textAlign: 'center', marginTop: 40 },
@@ -315,6 +384,18 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: 'bold', flexShrink: 1 }, 
   leaveText: { color: '#CC3B3B', fontWeight: '600' },
   date: { color: '#555', marginTop: 4, fontSize: 12 },
+  centerBadge: { alignSelf: 'flex-start', backgroundColor: '#e7f6fb', borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 11, paddingHorizontal: 11, paddingVertical: 7, marginTop: 12 },
+  centerBadgeLabel: { color: '#008d8d', fontSize: 9, fontWeight: 'bold', letterSpacing: 0.8 },
+  centerBadgeName: { color: '#164c67', fontSize: 13, fontWeight: 'bold', marginTop: 2 },
+  centerRequestBox: { marginTop: 14, padding: 13, borderRadius: 13, borderWidth: 1, borderColor: '#c5e9f3', backgroundColor: '#f2fbfd' },
+  centerRequestTitle: { color: '#164c67', fontWeight: 'bold', fontSize: 14 },
+  centerRequestHint: { color: '#718394', fontSize: 11, marginTop: 4, marginBottom: 8 },
+  centerPickerWrap: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 10, backgroundColor: '#fff', overflow: 'hidden' },
+  centerPicker: { height: 44, color: '#334155' },
+  requestCenterButton: { marginTop: 9, backgroundColor: '#00A8A8', padding: 11, borderRadius: 20, alignItems: 'center' },
+  requestDisabled: { opacity: 0.5 },
+  requestCenterText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
+  pendingCenterText: { color: '#008d78', fontSize: 11, marginTop: 8, fontWeight: 'bold' },
 
   statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 },
   statBox: {
@@ -373,12 +454,24 @@ const styles = StyleSheet.create({
   sightingHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   sightingHint: { color: '#718394', fontSize: 12, marginTop: -6, marginBottom: 12 },
   sightingCount: { minWidth: 28, height: 28, borderRadius: 14, backgroundColor: '#0077CC', color: '#fff', textAlign: 'center', lineHeight: 28, fontWeight: 'bold' },
-  sightingGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  compactSightingGrid: { flexWrap: 'nowrap', width: 860, paddingRight: 28 },
-  sightingOption: { width: 132, minHeight: 46, borderRadius: 12, padding: 9, backgroundColor: '#f8fbfd', borderWidth: 1, borderColor: '#dbe8ef', justifyContent: 'center' },
-  sightingOptionSelected: { backgroundColor: '#e6faf6', borderColor: '#00A8A8', transform: [{ translateX: 12 }, { translateY: -7 }], marginLeft: -8, zIndex: 4 },
-  sightingName: { color: '#41596b', fontSize: 12, fontWeight: 'bold' },
+  sightingSearchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 7 },
+  sightingSearchInput: { flex: 1, minHeight: 44, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, color: '#334155', fontSize: 14, backgroundColor: '#fff' },
+  sightingClearButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#e8f2f6', alignItems: 'center', justifyContent: 'center', marginLeft: -40, marginRight: 5 },
+  sightingClearText: { color: '#557180', fontSize: 21, lineHeight: 22 },
+  sightingResultHint: { color: '#718394', fontSize: 11, marginBottom: 8 },
+  sightingList: { maxHeight: 360, borderWidth: 1, borderColor: '#dbe8ef', borderRadius: 12, backgroundColor: '#fbfdfe' },
+  sightingListItem: { minHeight: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#e8f0f3' },
+  sightingListItemSelected: { backgroundColor: '#e6faf6', borderLeftWidth: 4, borderLeftColor: '#00A8A8', paddingLeft: 8 },
+  sightingCheckbox: { width: 23, height: 23, borderRadius: 7, borderWidth: 1.5, borderColor: '#a8bec9', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  sightingCheckboxSelected: { backgroundColor: '#00A8A8', borderColor: '#00A8A8' },
+  sightingCheckboxText: { color: '#fff', fontSize: 15, lineHeight: 17, fontWeight: 'bold' },
+  sightingListCopy: { flex: 1, minWidth: 0 },
+  sightingListName: { color: '#41596b', fontSize: 13, fontWeight: 'bold' },
   sightingNameSelected: { color: '#008d8d' },
+  sightingListCategory: { color: '#7890a0', fontSize: 11, marginTop: 3 },
+  sightingEmpty: { padding: 22, alignItems: 'center' },
+  sightingEmptyTitle: { color: '#164c67', fontWeight: 'bold' },
+  sightingEmptyText: { color: '#718394', fontSize: 12, marginTop: 4 },
   saveSightingsButton: { marginTop: 14, backgroundColor: '#00A8A8', padding: 12, borderRadius: 24, alignItems: 'center' },
 
   buddyCard: {

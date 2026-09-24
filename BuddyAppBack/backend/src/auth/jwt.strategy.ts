@@ -17,6 +17,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: any) {
     // Lo que devuelve aquí se puede inyectar en @Request() o @User()
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    return { userId: payload.userId, email: payload.email };
+    return { userId: payload.userId, email: payload.email, accountType: payload.accountType || 'diver', centerId: payload.centerId || null };
   }
 }

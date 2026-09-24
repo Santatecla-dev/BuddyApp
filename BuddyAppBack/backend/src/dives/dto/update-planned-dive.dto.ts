@@ -13,4 +13,5 @@ export class UpdatePlannedDiveDto {
   @IsOptional() @IsBoolean() shoreEntry?: boolean;
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsObject() checklist?: Record<string, boolean>;
+  @IsOptional() @IsInt() centerId?: number;
 }

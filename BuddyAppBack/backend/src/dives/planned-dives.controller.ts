@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreatePlannedDiveDto } from './dto/create-planned-dive.dto';
+import { CreateCenterPlannedDiveDto } from './dto/create-center-planned-dive.dto';
 import { UpdatePlannedDiveDto } from './dto/update-planned-dive.dto';
 import { PlannedDivesService } from './planned-dives.service';
 
@@ -26,4 +27,12 @@ export class PlannedDivesController {
 
   @Post(':id/log')
   log(@Param('id', ParseIntPipe) id: number, @Req() req) { return this.service.log(id, req.user.userId); }
+  @Post('center')
+  createForCenter(@Body() dto: CreateCenterPlannedDiveDto, @Req() req) { return this.service.createForCenter(dto, req.user.userId); }
+
+  @Get('invites/pending')
+  pendingInvites(@Req() req) { return this.service.pendingInvites(req.user.userId); }
+
+  @Post('invite/:id/respond')
+  respondInvite(@Param('id', ParseIntPipe) id: number, @Body() body: { accept: boolean }, @Req() req) { return this.service.respondInvite(id, req.user.userId, body.accept); }
 }

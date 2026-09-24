@@ -22,6 +22,12 @@ import EquipmentDetailScreen from './src/screens/EquipmentDetailScreen';
 import AchievementsScreen from './src/screens/AchievementsScreen';
 import PokedexScreen from './src/screens/PokedexScreen';
 import ActivityFeedScreen from './src/screens/ActivityFeedScreen';
+import CenterRegisterScreen from './src/screens/CenterRegisterScreen';
+import CenterDashboardScreen from './src/screens/CenterDashboardScreen';
+import CenterInventoryScreen from './src/screens/CenterInventoryScreen';
+import CenterClientsScreen from './src/screens/CenterClientsScreen';
+import CenterLogDiveScreen from './src/screens/CenterLogDiveScreen';
+import CenterProfileScreen from './src/screens/CenterProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -37,6 +43,13 @@ export default function App() {
       >
         <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Login' }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Register' }} />
+        <Stack.Screen name="CenterRegister" component={CenterRegisterScreen} options={{ title: 'Register dive center', headerTintColor: '#123b52' }} />
+        <Stack.Screen name="CenterDashboard" component={CenterDashboardScreen} options={{ title: 'Center workspace', headerTintColor: '#123b52' }} />
+        <Stack.Screen name="CenterProfile" component={CenterProfileScreen} options={{ title: 'Center profile', headerTintColor: '#123b52' }} />
+        <Stack.Screen name="CenterInventory" component={CenterInventoryScreen} options={{ title: 'Center inventory', headerTintColor: '#123b52' }} />
+        <Stack.Screen name="CenterClients" component={CenterClientsScreen} options={{ title: 'Center clients', headerTintColor: '#123b52' }} />
+        <Stack.Screen name="CenterLogDive" component={CenterLogDiveScreen} options={{ title: 'Log center dive', headerTintColor: '#123b52' }} />
+        <Stack.Screen name="CenterPlanDive" component={PlanDiveScreen} initialParams={{ centerMode: true }} options={{ title: 'Plan center dive', headerTintColor: '#123b52' }} />
         <Stack.Screen name="MyDives" component={MyDivesScreen} options={{ title: 'My Dives' }} />
         <Stack.Screen name="DiveDetail" component={DiveDetailScreen} options={{ title: 'Dive Details' }} />
         <Stack.Screen name="CreateDive" component={CreateDiveScreen} options={{ title: 'New Dive' }} />

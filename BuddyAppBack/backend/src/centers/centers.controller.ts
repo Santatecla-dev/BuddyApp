@@ -1,0 +1,65 @@
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CentersService } from './centers.service';
+import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
+import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
+import { CreateCenterDiveDto } from './dto/create-center-dive.dto';
+import { RespondCenterLinkDto } from './dto/respond-center-link.dto';
+import { CreateInventoryBulkDto } from './dto/create-inventory-bulk.dto';
+import { UpdateCenterProfileDto } from './dto/update-center-profile.dto';
+
+@UseGuards(JwtAuthGuard)
+@Controller('center')
+export class CentersController {
+  constructor(private readonly service: CentersService) {}
+
+  @Get('dashboard')
+  dashboard(@Req() req) { return this.service.dashboard(req.user.userId); }
+
+  @Get('profile')
+  profile(@Req() req) { return this.service.profile(req.user.userId); }
+
+  @Patch('profile')
+  updateProfile(@Body() dto: UpdateCenterProfileDto, @Req() req) { return this.service.updateProfile(req.user.userId, dto); }
+
+  @Post('dives')
+  createDive(@Body() dto: CreateCenterDiveDto, @Req() req) { return this.service.createDive(req.user.userId, dto); }
+
+  @Get('link-requests')
+  linkRequests(@Req() req) { return this.service.listLinkRequests(req.user.userId); }
+
+  @Patch('link-requests/:id')
+  respondLinkRequest(@Param('id', ParseIntPipe) id: number, @Body() dto: RespondCenterLinkDto, @Req() req) {
+    return this.service.respondToLinkRequest(id, req.user.userId, dto.accept);
+  }
+
+  @Get('inventory')
+  inventory(@Req() req) { return this.service.listInventory(req.user.userId); }
+
+  @Post('inventory')
+  createInventory(@Body() dto: CreateInventoryItemDto, @Req() req) { return this.service.createInventory(req.user.userId, dto); }
+
+  @Post('inventory/bulk')
+  createInventoryBulk(@Body() dto: CreateInventoryBulkDto, @Req() req) { return this.service.createInventoryBulk(req.user.userId, dto); }
+
+  @Patch('inventory/:id')
+  updateInventory(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateInventoryItemDto, @Req() req) { return this.service.updateInventory(id, req.user.userId, dto); }
+
+  @Delete('inventory/:id')
+  removeInventory(@Param('id', ParseIntPipe) id: number, @Req() req) { return this.service.removeInventory(id, req.user.userId); }
+
+  @Get('clients')
+  clients(@Req() req) { return this.service.listClients(req.user.userId); }
+}
+
+@UseGuards(JwtAuthGuard)
+@Controller('dive-centers')
+export class DiveCentersController {
+  constructor(private readonly service: CentersService) {}
+
+  @Get()
+  list(@Req() req) { return this.service.publicList(req.query?.search); }
+
+  @Get(':id')
+  get(@Param('id', ParseIntPipe) id: number) { return this.service.publicGet(id); }
+}

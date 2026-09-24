@@ -45,4 +45,8 @@ export class CreatePlannedDiveDto {
   @IsOptional()
   @IsObject()
   checklist?: Record<string, boolean>;
+
+  @IsOptional()
+  @IsInt()
+  centerId?: number;
 }

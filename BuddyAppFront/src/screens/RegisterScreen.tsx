@@ -109,6 +109,9 @@ export default function RegisterScreen({ navigation }: any) {
               {loading ? 'Registering…' : 'Register'}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" style={styles.centerLink} onPress={() => navigation.navigate('CenterRegister')}>
+            <Text style={styles.centerLinkText}>Register as a dive center instead</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -184,6 +187,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  centerLink: { alignItems: 'center', padding: 12, marginTop: 3 },
+  centerLinkText: { color: '#008d8d', fontWeight: 'bold', fontSize: 13 },
 
   error: {
     color: '#D32F2F',

@@ -4,6 +4,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UseGuards, Get, Req } from '@nestjs/common';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { RegisterCenterDto } from '../centers/dto/register-center.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -12,6 +13,10 @@ export class AuthController {
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+  @Post('register-center')
+  registerCenter(@Body() dto: RegisterCenterDto) {
+    return this.authService.registerCenter(dto);
   }
   @Post('login')
   login(@Body() dto: LoginDto) {

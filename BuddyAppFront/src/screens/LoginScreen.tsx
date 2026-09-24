@@ -23,7 +23,7 @@ export default function LoginScreen({ navigation }: any) {
       const res = await API.post('/auth/login', { email, password });
       const token = res.data.accessToken;
       API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      navigation.navigate('MyDives');
+      navigation.navigate(res.data.accountType === 'center' ? 'CenterDashboard' : 'MyDives');
     } catch (err: any) {
       console.log('Error login:', err.response ? err.response.data : err.message);
       setError('Invalid credentials');
@@ -89,6 +89,9 @@ export default function LoginScreen({ navigation }: any) {
             accessibilityRole="button"
           >
             <Text style={styles.buttonText}>Register</Text>
+          </TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" style={styles.centerLink} onPress={() => navigation.navigate('CenterRegister')}>
+            <Text style={styles.centerLinkText}>Register a dive center</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -169,6 +172,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  centerLink: { alignItems: 'center', padding: 13, marginTop: 4 },
+  centerLinkText: { color: '#008d8d', fontWeight: 'bold', fontSize: 13 },
 
   error: {
     color: '#D32F2F',

@@ -14,6 +14,7 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import API from '../api/api';
 import { PokedexSpecies } from '../types';
+import CenterSearchField from '../components/CenterSearchField';
 import { getNewAchievementIds, getUnlockedAchievementIds } from '../utils/achievements';
 
 export const COUNTRIES = [
@@ -45,6 +46,7 @@ export default function CreateDiveScreen({ navigation }: any) {
   const [submitError, setSubmitError] = useState('');
   const [country, setCountry] = useState('');
   const [location, setLocation] = useState('');
+  const [centerId, setCenterId] = useState('');
 
   const [day, setDay] = useState('');
   const [month, setMonth] = useState('');
@@ -102,6 +104,7 @@ export default function CreateDiveScreen({ navigation }: any) {
         duration: parseInt(duration),
         notes,
         sightings,
+        centerId: centerId ? Number(centerId) : undefined,
       });
 
       const newAchievements = await getNewAchievementIds(previousAchievements);
@@ -136,6 +139,8 @@ export default function CreateDiveScreen({ navigation }: any) {
         <Text style={styles.label}>Location</Text>
         <TextInput accessibilityLabel="Location" placeholder="Dive site name" value={location} onChangeText={setLocation} style={styles.input} />
         {error('location')}
+        <Text style={styles.label}>Request dive center link (optional)</Text>
+        <CenterSearchField selectedCenterId={centerId} onSelect={(center) => setCenterId(center ? String(center.id) : '')} label="Request dive center link (optional)" />
         <Text style={styles.label}>Date and Local Time</Text>
         <View style={styles.dateRow}>
           {[
