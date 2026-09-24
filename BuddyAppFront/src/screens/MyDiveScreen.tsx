@@ -92,6 +92,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
   const [dives, setDives] = useState<Dive[]>([]);
   const [groupedByCountry, setGroupedByCountry] = useState(false);
   const [hasPendingInvites, setHasPendingInvites] = useState(false);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [diverId, setDiverId] = useState<number | null>(null);
   const [favoriteBuddy, setFavoriteBuddy] = useState<FavoriteBuddy | null>(null);
 
@@ -159,9 +160,19 @@ export default function MyDivesScreen({ navigation, route }: any) {
     }
   };
 
+  const fetchNotificationCount = async () => {
+    try {
+      const res = await API.get('/notifications/unread-count');
+      setNotificationUnreadCount(Number(res.data?.unreadCount) || 0);
+    } catch {
+      setNotificationUnreadCount(0);
+    }
+  };
+
   useEffect(() => {
     fetchDives();
     fetchPendingInvites();
+    fetchNotificationCount();
 
     try {
       const authHeader = API.defaults.headers.common['Authorization'];
@@ -179,6 +190,7 @@ export default function MyDivesScreen({ navigation, route }: any) {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchDives();
       fetchPendingInvites();
+      fetchNotificationCount();
     });
 
     return unsubscribe;
@@ -245,6 +257,14 @@ export default function MyDivesScreen({ navigation, route }: any) {
           onPress={() => navigation.navigate('Profile', { userId: undefined })}
         >
           <Text style={styles.profileIcon}>👤</Text>
+        </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button"
+          style={styles.notificationButton}
+          accessibilityLabel={`Notifications${notificationUnreadCount ? `, ${notificationUnreadCount} unread` : ''}`}
+          onPress={() => navigation.navigate('Notifications')}
+        >
+          <Text style={styles.notificationIcon}>🔔</Text>
+          {notificationUnreadCount > 0 ? <View style={styles.notificationBadge}><Text style={styles.notificationBadgeText}>{notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}</Text></View> : null}
         </TouchableOpacity>
       </View>
 
@@ -691,6 +711,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minWidth: 48,
     minHeight: 48,
+  },
+
+  notificationButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 48,
+    minHeight: 48,
+    position: 'relative',
+  },
+
+  notificationIcon: {
+    fontSize: 24,
+  },
+
+  notificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#df5b76',
+  },
+
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
   },
 
   profileIcon: {

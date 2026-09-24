@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Dive } from '../dives/dive.entity';
@@ -7,6 +7,7 @@ import { DiveSighting } from '../dives/dive-sighting.entity';
 import { POKEDEX_SPECIES } from '../dives/pokedex.catalog';
 import { AchievementPin } from './achievement-pin.entity';
 import { AchievementState } from './achievement-state.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export type AchievementDefinition = {
   id: string;
@@ -92,6 +93,7 @@ export class AchievementsService {
     @InjectRepository(DiveSighting) private readonly sightingRepo: Repository<DiveSighting>,
     @InjectRepository(AchievementState) private readonly stateRepo: Repository<AchievementState>,
     @InjectRepository(AchievementPin) private readonly pinRepo: Repository<AchievementPin>,
+    @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
   async list(userId: number) {
@@ -130,6 +132,17 @@ export class AchievementsService {
         state.unlockedAt = new Date();
         state = await this.stateRepo.save(state);
         stateById.set(definition.id, state);
+        try {
+          await this.notificationsService?.create({
+            recipientId: userId,
+            type: 'achievement',
+            title: 'Achievement unlocked',
+            body: definition.title,
+            entityType: 'achievement',
+            entityId: definition.id,
+            dedupeKey: `achievement:${userId}:${definition.id}`,
+          });
+        } catch {}
       } else if (!isUnlocked && state?.unlocked) {
         state.unlocked = false;
         state = await this.stateRepo.save(state);

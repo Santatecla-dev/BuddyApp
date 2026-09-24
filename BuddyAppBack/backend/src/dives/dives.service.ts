@@ -14,6 +14,7 @@ import { DiveInvite, InviteStatus } from './dive-invite.entity';
 import { DiveSighting } from './dive-sighting.entity';
 import { AddSightingsToDivesDto } from './dto/update-sightings.dto';
 import { getSpecies, POKEDEX_SPECIES } from './pokedex.catalog';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class DivesService {
@@ -30,7 +31,25 @@ export class DivesService {
 
     @InjectRepository(DiveSighting)
     private diveSightingRepo: Repository<DiveSighting>,
+    private notificationsService: NotificationsService,
   ) {}
+
+  private async notifyDiveBuddiesOfSightings(diveId: number, actorId: number, speciesKeys: string[]) {
+    if (!speciesKeys.length) return;
+    const buddies = await this.diveBuddyRepo.find({ where: { diveId } });
+    const names = speciesKeys.map((key) => getSpecies(key)?.name || key).slice(0, 3);
+    const suffix = names.join(', ');
+    await Promise.all(buddies.filter((buddy) => buddy.userId !== actorId).map((buddy) => this.notificationsService.create({
+      recipientId: buddy.userId,
+      actorId,
+      type: 'sighting',
+      title: 'New marine life sighting',
+      body: `A buddy added ${suffix} to a dive you share.`,
+      entityType: 'dive',
+      entityId: String(diveId),
+      dedupeKey: `sighting:${diveId}:${actorId}:${speciesKeys.slice().sort().join('|')}`,
+    })));
+  }
 
   async createDive(dto: CreateDiveDto, creatorUserId: number) {
     // 1️⃣ Crear la inmersión (única)
@@ -108,7 +127,10 @@ export class DivesService {
     const additions = requested
       .filter((key) => !existingKeys.has(key))
       .map((speciesKey) => this.diveSightingRepo.create({ diveId, speciesKey, createdByUserId: userId }));
-    if (additions.length) await this.diveSightingRepo.save(additions);
+    if (additions.length) {
+      await this.diveSightingRepo.save(additions);
+      await this.notifyDiveBuddiesOfSightings(diveId, userId, additions.map((sighting) => sighting.speciesKey));
+    }
     return this.getDiveSightings(diveId, userId);
   }
 
@@ -123,6 +145,7 @@ export class DivesService {
       const existing = await this.diveSightingRepo.findOne({ where: { diveId, speciesKey: dto.speciesKey } });
       if (!existing) {
         await this.diveSightingRepo.save(this.diveSightingRepo.create({ diveId, speciesKey: dto.speciesKey, createdByUserId: userId }));
+        await this.notifyDiveBuddiesOfSightings(diveId, userId, [dto.speciesKey]);
         addedTo.push(diveId);
       }
     }
@@ -179,7 +202,18 @@ export class DivesService {
       status: InviteStatus.PENDING,
     });
 
-    return this.diveInviteRepo.save(invite);
+    const savedInvite = await this.diveInviteRepo.save(invite);
+    await this.notificationsService.create({
+      recipientId: invitedUserId,
+      actorId: inviterUserId,
+      type: 'invite',
+      title: 'New dive invitation',
+      body: 'A buddy invited you to join a dive.',
+      entityType: 'invite',
+      entityId: String(savedInvite.id),
+      dedupeKey: `invite:${savedInvite.id}`,
+    });
+    return savedInvite;
   }
 
   async acceptInvite(inviteId: number, userId: number) {
@@ -224,7 +258,18 @@ export class DivesService {
 
     // 6️⃣ Actualizar estado de invitación
     invite.status = InviteStatus.ACCEPTED;
-    return this.diveInviteRepo.save(invite);
+    const savedInvite = await this.diveInviteRepo.save(invite);
+    await this.notificationsService.create({
+      recipientId: invite.invitedByUserId,
+      actorId: userId,
+      type: 'invite_accepted',
+      title: 'Dive invitation accepted',
+      body: 'Your buddy accepted a dive invitation.',
+      entityType: 'dive',
+      entityId: String(invite.diveId),
+      dedupeKey: `invite-accepted:${invite.id}`,
+    });
+    return savedInvite;
   }
   async rejectInvite(inviteId: number, userId: number) {
     // 1️⃣ Buscar invitación
@@ -248,7 +293,18 @@ export class DivesService {
 
     // 4️⃣ Rechazar invitación
     invite.status = InviteStatus.REJECTED;
-    return this.diveInviteRepo.save(invite);
+    const savedInvite = await this.diveInviteRepo.save(invite);
+    await this.notificationsService.create({
+      recipientId: invite.invitedByUserId,
+      actorId: userId,
+      type: 'invite_rejected',
+      title: 'Dive invitation declined',
+      body: 'Your buddy declined a dive invitation.',
+      entityType: 'dive',
+      entityId: String(invite.diveId),
+      dedupeKey: `invite-rejected:${invite.id}`,
+    });
+    return savedInvite;
   }
   async getPendingInvites(userId: number) {
     return this.diveInviteRepo.find({

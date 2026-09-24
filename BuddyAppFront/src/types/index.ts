@@ -172,3 +172,24 @@ export interface PokedexSpecies {
   imageUrl: string;
   sightingsCount?: number;
 }
+
+export type NotificationType = 'dive' | 'comment' | 'reaction' | 'invite' | 'invite_accepted' | 'invite_rejected' | 'achievement' | 'sighting';
+
+export interface NotificationItem {
+  id: number;
+  type: NotificationType;
+  title: string;
+  body: string;
+  createdAt: string;
+  readAt?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  actor?: { id: number; name: string } | null;
+}
+
+export interface NotificationsResponse {
+  items: NotificationItem[];
+  unreadCount: number;
+  nextCursor: string | null;
+  hasMore: boolean;
+}

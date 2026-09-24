@@ -7,9 +7,10 @@ import { AchievementPin } from './achievement-pin.entity';
 import { AchievementState } from './achievement-state.entity';
 import { AchievementsController } from './achievements.controller';
 import { AchievementsService } from './achievements.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Dive, DiveBuddy, DiveSighting, AchievementState, AchievementPin])],
+  imports: [NotificationsModule, TypeOrmModule.forFeature([Dive, DiveBuddy, DiveSighting, AchievementState, AchievementPin])],
   controllers: [AchievementsController],
   providers: [AchievementsService],
   exports: [AchievementsService],

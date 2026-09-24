@@ -12,7 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import API from '../api/api';
 import { Dive, DiveTrip, PlannedDive } from '../types';
 
-type ActivityKind = 'logged' | 'planned';
+type ActivityKind = 'logged' | 'planned' | 'trip';
 type ActivityFilter = 'all' | ActivityKind;
 type DisplayMode = 'calendar' | 'list';
 
@@ -30,6 +30,9 @@ type ActivityItem = {
   condition?: string;
   status?: string;
   tripName?: string;
+  tripId?: number;
+  endDate?: string;
+  isTrip?: boolean;
 };
 
 const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -163,7 +166,22 @@ export default function DiveActivityScreen({ navigation }: any) {
       status: plan.status,
       tripName: tripNames.get(plan.id),
     })),
-  ], [dives, plannedDives, tripNames]);
+    ...trips.map((trip) => ({
+      key: `trip-${trip.id}`,
+      id: trip.id,
+      kind: 'trip' as const,
+      date: trip.startDate,
+      dateKey: dateKey(trip.startDate),
+      location: trip.name,
+      country: trip.destination,
+      maxDepth: Math.max(0, ...(trip.plannedDives || []).map((plan) => Number(plan.maxDepth || 0))),
+      duration: (trip.plannedDives || []).reduce((total, plan) => total + Number(plan.duration || 0), 0),
+      status: trip.status,
+      tripName: trip.name,
+      tripId: trip.id,
+      endDate: trip.endDate,
+    })),
+  ], [dives, plannedDives, tripNames, trips]);
 
   const visibleActivities = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -173,17 +191,49 @@ export default function DiveActivityScreen({ navigation }: any) {
       .sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
   }, [activities, filter, query]);
 
-  const monthActivities = useMemo(() => visibleActivities.filter((item) => sameMonth(item.date, month)), [month, visibleActivities]);
-  const byDate = useMemo(() => visibleActivities.reduce<Record<string, ActivityItem[]>>((result, item) => {
-    (result[item.dateKey] ||= []).push(item);
+  const monthActivities = useMemo(() => {
+    const monthStart = new Date(month.getFullYear(), month.getMonth(), 1).getTime();
+    const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59).getTime();
+    return visibleActivities.filter((item) => {
+      if (item.kind !== 'trip') return sameMonth(item.date, month);
+      const start = parseDate(item.date).getTime();
+      const end = parseDate(item.endDate || item.date).getTime();
+      return start <= monthEnd && end >= monthStart;
+    });
+  }, [month, visibleActivities]);
+  const byDate = useMemo(() => {
+    const result: Record<string, ActivityItem[]> = {};
+    visibleActivities.forEach((item) => {
+      if (item.kind !== 'trip') {
+        (result[item.dateKey] ||= []).push(item);
+        return;
+      }
+      const start = parseDate(item.date);
+      const end = parseDate(item.endDate || item.date);
+      const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+      while (cursor <= last) {
+        const key = dateKeyFromDate(cursor);
+        (result[key] ||= []).push({ ...item, key: `${item.key}-${key}`, date: key, dateKey: key });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    });
     return result;
-  }, {}), [visibleActivities]);
+  }, [visibleActivities]);
   const monthLogged = monthActivities.filter((item) => item.kind === 'logged').length;
   const monthPlanned = monthActivities.filter((item) => item.kind === 'planned').length;
+  const monthTrips = monthActivities.filter((item) => item.kind === 'trip').length;
   const maxDepth = monthActivities.reduce((max, item) => Math.max(max, item.maxDepth), 0);
   const totalMinutes = monthActivities.reduce((total, item) => total + item.duration, 0);
   const weeks = useMemo(() => getCalendarWeeks(month), [month]);
-  const selectedDayItems = selectedDay ? (byDate[selectedDay.key] || []) : [];
+  // The day detail reuses the calendar entries, but a trip is not a logged dive.
+  // Give it its own human-readable state in this compact list while preserving
+  // the trip id so tapping it still opens the trip workspace.
+  const selectedDayItems = selectedDay
+    ? (byDate[selectedDay.key] || []).map((item) => item.tripId
+      ? { ...item, kind: 'planned' as const, buddy: 'Dive trip', isTrip: true }
+      : item)
+    : [];
 
   const changeMonth = (next: Date) => {
     setMonth(next);
@@ -192,6 +242,10 @@ export default function DiveActivityScreen({ navigation }: any) {
   };
   const moveMonth = (amount: number) => changeMonth(new Date(month.getFullYear(), month.getMonth() + amount, 1));
   const openActivity = (item: ActivityItem) => {
+    if (item.tripId) {
+      navigation.navigate('DiveTripWorkspace', { tripId: item.tripId });
+      return;
+    }
     setSelected(item);
   };
 
@@ -217,7 +271,7 @@ export default function DiveActivityScreen({ navigation }: any) {
             <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: mode === 'list' }} onPress={() => setMode('list')} style={[styles.modeButton, mode === 'list' && styles.modeButtonActive]}><Text style={[styles.modeText, mode === 'list' && styles.modeTextActive]}>List</Text></TouchableOpacity>
           </View>
           <View style={styles.filterRow}>
-            {([['all', 'Everything'], ['logged', 'Logged'], ['planned', 'Planned']] as [ActivityFilter, string][]).map(([value, label]) => (
+            {([['all', 'Everything'], ['logged', 'Logged'], ['planned', 'Planned'], ['trip', 'Trips']] as [ActivityFilter, string][]).map(([value, label]) => (
               <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => { setFilter(value); setSelected(null); }} style={[styles.filterChip, filter === value && styles.filterChipActive]}><Text style={[styles.filterText, filter === value && styles.filterTextActive]}>{label}</Text></TouchableOpacity>
             ))}
           </View>
@@ -230,6 +284,7 @@ export default function DiveActivityScreen({ navigation }: any) {
           <View style={styles.summaryRow}>
             <View style={[styles.summaryCard, compact && styles.summaryCardCompact]}><Text style={styles.summaryValue}>{monthLogged}</Text><Text style={styles.summaryLabel}>Logged this month</Text></View>
             <View style={[styles.summaryCard, compact && styles.summaryCardCompact]}><Text style={styles.summaryValue}>{monthPlanned}</Text><Text style={styles.summaryLabel}>Planned this month</Text></View>
+            <View style={[styles.summaryCard, compact && styles.summaryCardCompact]}><Text style={styles.summaryValue}>{monthTrips}</Text><Text style={styles.summaryLabel}>Trips this month</Text></View>
             <View style={[styles.summaryCard, compact && styles.summaryCardCompact]}><Text style={styles.summaryValue}>{maxDepth}m</Text><Text style={styles.summaryLabel}>Deepest</Text></View>
             <View style={[styles.summaryCard, compact && styles.summaryCardCompact]}><Text style={styles.summaryValue}>{Math.round(totalMinutes / 60)}h</Text><Text style={styles.summaryLabel}>Underwater time</Text></View>
           </View>
@@ -246,13 +301,13 @@ export default function DiveActivityScreen({ navigation }: any) {
               {week.map(({ date, inMonth }) => {
                 const key = dateKeyFromDate(date);
                 const dayItems = byDate[key] || [];
-                return <TouchableOpacity key={key} accessibilityRole="button" accessibilityLabel={`Show activity for ${date.toLocaleDateString()}: ${dayItems.filter(item => item.kind === 'logged').length} logged, ${dayItems.filter(item => item.kind === 'planned').length} planned`} accessibilityState={{ selected: selectedDay?.key === key }} onPress={() => setSelectedDay({ key, date })} style={[styles.dayCell, !inMonth && styles.dayCellMuted, selectedDay?.key === key && styles.dayCellSelected]}>
+                return <TouchableOpacity key={key} accessibilityRole="button" accessibilityLabel={`Show activity for ${date.toLocaleDateString()}: ${dayItems.filter(item => item.kind === 'logged').length} logged, ${dayItems.filter(item => item.kind === 'planned').length} planned, ${dayItems.filter(item => item.kind === 'trip').length} trips`} accessibilityState={{ selected: selectedDay?.key === key }} onPress={() => setSelectedDay({ key, date })} style={[styles.dayCell, !inMonth && styles.dayCellMuted, selectedDay?.key === key && styles.dayCellSelected]}>
                   <Text style={[styles.dayNumber, !inMonth && styles.dayNumberMuted]}>{date.getDate()}</Text>
-                  {compact ? (['logged', 'planned'] as ActivityKind[]).map(kind => {
+                  {compact ? (['logged', 'planned', 'trip'] as ActivityKind[]).map(kind => {
                     const count = dayItems.filter(item => item.kind === kind).length;
-                    return count ? <View key={kind} style={[styles.activityCount, kind === 'planned' ? styles.plannedPill : styles.loggedPill]}><Text style={styles.activityPillText}>{kind === 'logged' ? 'L' : 'P'} {count}</Text></View> : null;
+                    return count ? <View key={kind} style={[styles.activityCount, kind === 'planned' ? styles.plannedPill : kind === 'trip' ? styles.tripPill : styles.loggedPill]}><Text style={styles.activityPillText}>{kind === 'logged' ? 'L' : kind === 'planned' ? 'P' : 'T'} {count}</Text></View> : null;
                   }) : <>
-                    {dayItems.slice(0, 2).map((item) => <View key={item.key} style={[styles.activityPill, item.kind === 'planned' ? styles.plannedPill : styles.loggedPill]}><Text numberOfLines={1} style={styles.activityPillText}>{item.location}</Text></View>)}
+                    {dayItems.slice(0, 2).map((item) => <View key={item.key} style={[styles.activityPill, item.kind === 'planned' ? styles.plannedPill : item.kind === 'trip' ? styles.tripPill : styles.loggedPill]}><Text numberOfLines={1} style={styles.activityPillText}>{item.kind === 'trip' ? `Trip · ${item.location}` : item.location}</Text></View>)}
                     {dayItems.length > 2 ? <Text style={styles.moreText}>+{dayItems.length - 2} more</Text> : null}
                   </>}
                 </TouchableOpacity>;
@@ -260,12 +315,12 @@ export default function DiveActivityScreen({ navigation }: any) {
             </View>)}
             {selectedDay ? <View style={styles.dayDetailCard}>
               <View style={styles.dayDetailHeader}><View style={styles.detailCopy}><Text style={styles.detailEyebrow}>Selected day</Text><Text style={styles.dayDetailTitle}>{selectedDay.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</Text></View><TouchableOpacity accessibilityLabel="Close selected day" accessibilityRole="button" style={styles.closeButton} onPress={() => setSelectedDay(null)}><Text style={styles.closeText}>×</Text></TouchableOpacity></View>
-              {selectedDayItems.length ? <View style={styles.dayDetailList}>{selectedDayItems.map((item) => <TouchableOpacity key={item.key} accessibilityRole="button" style={[styles.dayActivityRow, item.kind === 'planned' && styles.dayActivityRowPlanned]} onPress={() => openActivity(item)}><View style={styles.dayActivityCopy}><Text style={styles.dayActivityLocation}>{item.location}</Text><Text style={styles.dayActivityMeta}>{item.country} · {item.maxDepth}m · {item.duration} min</Text><Text style={styles.dayActivityStatus}>{item.kind === 'planned' ? `Planned${item.buddy ? ` with ${item.buddy}` : ''}` : 'Logged dive'}</Text></View><Text style={styles.dayActivityArrow}>›</Text></TouchableOpacity>)}</View> : <View style={styles.noDayActivity}><Text style={styles.noDayTitle}>No matching dives for this day</Text><Text style={styles.noDayText}>There are no logged or planned dives matching the current filters.</Text><TouchableOpacity accessibilityRole="button" style={styles.noDayButton} onPress={() => navigation.navigate('PlanDive')}><Text style={styles.noDayButtonText}>Plan a dive</Text></TouchableOpacity></View>}
+              {selectedDayItems.length ? <View style={styles.dayDetailList}>{selectedDayItems.map((item) => <TouchableOpacity key={item.key} accessibilityRole="button" style={[styles.dayActivityRow, item.kind === 'planned' && styles.dayActivityRowPlanned, item.isTrip && styles.dayActivityRowTrip]} onPress={() => openActivity(item)}><View style={styles.dayActivityCopy}><Text style={styles.dayActivityLocation}>{item.location}</Text><Text style={styles.dayActivityMeta}>{item.country} · {item.maxDepth}m · {item.duration} min</Text><Text style={[styles.dayActivityStatus, item.isTrip && styles.dayActivityStatusTrip]}>{item.isTrip ? 'Dive trip' : item.kind === 'planned' ? `Planned${item.buddy ? ` with ${item.buddy}` : ''}` : 'Logged dive'}</Text></View><Text style={styles.dayActivityArrow}>›</Text></TouchableOpacity>)}</View> : <View style={styles.noDayActivity}><Text style={styles.noDayTitle}>No matching dives for this day</Text><Text style={styles.noDayText}>There are no logged or planned dives matching the current filters.</Text><TouchableOpacity accessibilityRole="button" style={styles.noDayButton} onPress={() => navigation.navigate('PlanDive')}><Text style={styles.noDayButtonText}>Plan a dive</Text></TouchableOpacity></View>}
             </View> : null}
-            <View style={styles.legend}><View style={styles.legendItem}><View style={[styles.legendDot, styles.loggedDot]} /><Text style={styles.legendText}>{compact ? 'L · Logged' : 'Logged'}</Text></View><View style={styles.legendItem}><View style={[styles.legendDot, styles.plannedDot]} /><Text style={styles.legendText}>{compact ? 'P · Planned' : 'Planned'}</Text></View></View>
+            <View style={styles.legend}><View style={styles.legendItem}><View style={[styles.legendDot, styles.loggedDot]} /><Text style={styles.legendText}>{compact ? 'L · Logged' : 'Logged'}</Text></View><View style={styles.legendItem}><View style={[styles.legendDot, styles.plannedDot]} /><Text style={styles.legendText}>{compact ? 'P · Planned' : 'Planned'}</Text></View><View style={styles.legendItem}><View style={[styles.legendDot, styles.tripDot]} /><Text style={styles.legendText}>{compact ? 'T · Trip' : 'Dive trip'}</Text></View></View>
           </View> : <View style={styles.list}>
-            {visibleActivities.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Nothing matches these filters</Text><Text style={styles.emptyText}>Try another search or switch the activity type.</Text></View> : visibleActivities.map((item) => <TouchableOpacity key={item.key} accessibilityRole="button" style={[styles.listCard, item.kind === 'planned' && styles.listCardPlanned]} onPress={() => openActivity(item)}>
-              <View style={[styles.listDate, compact && styles.listDateCompact]}><Text style={styles.listDateDay}>{parseDate(item.date).getDate()}</Text><Text style={styles.listDateMonth}>{parseDate(item.date).toLocaleDateString(undefined, { month: 'short' })}</Text></View>
+            {visibleActivities.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Nothing matches these filters</Text><Text style={styles.emptyText}>Try another search or switch the activity type.</Text></View> : visibleActivities.map((item) => <TouchableOpacity key={item.key} accessibilityRole="button" style={[styles.listCard, item.kind === 'planned' && styles.listCardPlanned, item.kind === 'trip' && styles.listCardTrip]} onPress={() => openActivity(item)}>
+              <View style={[styles.listDate, compact && styles.listDateCompact]}><Text style={styles.listDateDay}>{parseDate(item.date).getDate()}</Text><Text style={styles.listDateMonth}>{parseDate(item.date).toLocaleDateString(undefined, { month: 'short' })}</Text></View>{item.kind === 'trip' ? <View style={styles.tripLabelOverlay}><Text style={styles.tripLabel}>DIVE TRIP</Text></View> : null}
               <View style={styles.listMain}><View style={[styles.listTitleRow, compact && styles.listTitleRowCompact]}><Text style={[styles.listLocation, compact && styles.listLocationCompact]}>{item.location}</Text><Text style={item.kind === 'planned' ? styles.plannedLabel : styles.loggedLabel}>{item.kind === 'planned' ? 'PLANNED' : 'LOGGED'}</Text></View><Text style={styles.listCountry}>{item.country} · {formatDate(item.date)}</Text><Text style={styles.listMeta}>{item.maxDepth}m max · {item.duration} min{item.buddy ? ` · ${item.buddy}` : ''}{item.tripName ? ` · ${item.tripName}` : ''}</Text></View>
               <Text style={styles.listChevron}>›</Text>
             </TouchableOpacity>)}
@@ -347,6 +402,7 @@ const styles = StyleSheet.create({
   activityPill: { borderRadius: 6, paddingHorizontal: 5, paddingVertical: 5, marginBottom: 4, maxWidth: '100%' },
   loggedPill: { backgroundColor: '#e5f4fb' },
   plannedPill: { backgroundColor: '#e6f7f3' },
+  tripPill: { backgroundColor: '#fff1d8' },
   activityPillText: { color: '#25627d', fontSize: 10, fontWeight: '600' },
   moreText: { color: '#0077CC', fontSize: 10, marginTop: 2 },
   dayDetailCard: { marginTop: 18, padding: 14, backgroundColor: '#f9feff', borderWidth: 1, borderColor: '#d9eaf0', borderTopWidth: 3, borderTopColor: '#00A8A8', borderRadius: 12 },
@@ -355,10 +411,12 @@ const styles = StyleSheet.create({
   dayDetailList: { gap: 12 },
   dayActivityRow: { minHeight: 80, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 11, borderWidth: 1, borderColor: '#d9eaf0', paddingHorizontal: 13, paddingVertical: 12 },
   dayActivityRowPlanned: { borderLeftWidth: 5, borderLeftColor: '#55c6ad' },
+  dayActivityRowTrip: { borderLeftWidth: 5, borderLeftColor: '#d99a3d' },
   dayActivityCopy: { flex: 1, minWidth: 0 },
   dayActivityLocation: { color: '#164c67', fontSize: 15, fontWeight: 'bold' },
   dayActivityMeta: { color: '#6a7d8d', fontSize: 12, marginTop: 4 },
   dayActivityStatus: { color: '#008d8d', fontSize: 11, marginTop: 5 },
+  dayActivityStatusTrip: { color: '#b36b12' },
   dayActivityArrow: { color: '#0077CC', fontSize: 26, marginLeft: 12 },
   noDayActivity: { minHeight: 120, alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderStyle: 'dashed', borderColor: '#b8d8ee' },
   noDayTitle: { color: '#164c67', fontSize: 16, fontWeight: 'bold', textAlign: 'center' },
@@ -370,10 +428,12 @@ const styles = StyleSheet.create({
   legendDot: { width: 9, height: 9, borderRadius: 5 },
   loggedDot: { backgroundColor: '#56acd2' },
   plannedDot: { backgroundColor: '#55c6ad' },
+  tripDot: { backgroundColor: '#d99a3d' },
   legendText: { color: '#6a7d8d', fontSize: 12 },
   list: { gap: 16 },
   listCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 16, padding: 15 },
   listCardPlanned: { borderLeftWidth: 4, borderLeftColor: '#55c6ad' },
+  listCardTrip: { borderLeftWidth: 4, borderLeftColor: '#d99a3d', backgroundColor: '#fffdf7', position: 'relative' },
   listDate: { width: 76, alignItems: 'center', borderRightWidth: 1, borderRightColor: '#e7eef3', marginRight: 13, paddingRight: 12 },
   listDateDay: { color: '#0077CC', fontSize: 22, fontWeight: 'bold' },
   listDateMonth: { color: '#6a7d8d', textTransform: 'uppercase', fontSize: 11, fontWeight: 'bold' },
@@ -384,6 +444,8 @@ const styles = StyleSheet.create({
   listMeta: { color: '#7c8f9c', fontSize: 12, marginTop: 8 },
   loggedLabel: { color: '#0077CC', backgroundColor: '#e5f4fb', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 9, fontWeight: 'bold' },
   plannedLabel: { color: '#008d78', backgroundColor: '#e6f7f3', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 9, fontWeight: 'bold' },
+  tripLabel: { color: '#9a6418', backgroundColor: '#fff1d8', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 9, fontWeight: 'bold' },
+  tripLabelOverlay: { position: 'absolute', top: 9, right: 42 },
   listChevron: { color: '#0077CC', fontSize: 26, marginLeft: 8 },
   emptyCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 16, alignItems: 'center', padding: 28 },
   emptyTitle: { color: '#164c67', fontSize: 18, fontWeight: 'bold' },

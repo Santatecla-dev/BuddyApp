@@ -1,14 +1,28 @@
-import React, { useCallback, useMemo, useState } from 'react';
+﻿import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import API from '../api/api';
-import { DiveTrip, Equipment, EquipmentPacking, EquipmentServiceRecord, PlannedDive } from '../types';
+import { DiveTrip, Equipment, EquipmentCondition, EquipmentPacking, EquipmentServiceRecord, PlannedDive } from '../types';
 
 type Tab = 'overview' | 'maintenance' | 'packing';
 type PackContext = { key: string; kind: 'trip' | 'planned'; id: number; label: string; detail: string };
 type ServiceForm = { serviceDate: string; nextDueDate: string; serviceType: string; provider: string; cost: string; notes: string };
+type EditFormState = {
+  name: string;
+  category: string;
+  brand: string;
+  model: string;
+  nextServiceDate: string;
+  condition: EquipmentCondition;
+  notes: string;
+};
+
+const CATEGORIES = ['Regulator', 'BCD', 'Exposure', 'Computer', 'Camera', 'Accessories'];
+const CONDITIONS: EquipmentCondition[] = ['good', 'service_due', 'retired'];
+const CONDITION_LABELS: Record<EquipmentCondition, string> = { good: 'Ready', service_due: 'Service due', retired: 'Retired' };
 
 const EMPTY_SERVICE: ServiceForm = { serviceDate: '', nextDueDate: '', serviceType: 'Annual inspection', provider: '', cost: '', notes: '' };
+const EMPTY_EDIT_FORM: EditFormState = { name: '', category: CATEGORIES[0], brand: '', model: '', nextServiceDate: '', condition: 'good', notes: '' };
 const formatDate = (value?: string | null) => {
   if (!value) return 'Not specified';
   const date = new Date(value);
@@ -29,6 +43,10 @@ export default function EquipmentDetailScreen({ route, navigation }: any) {
   const [serviceModal, setServiceModal] = useState(false);
   const [serviceForm, setServiceForm] = useState<ServiceForm>(EMPTY_SERVICE);
   const [savingService, setSavingService] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [editForm, setEditForm] = useState<EditFormState>(EMPTY_EDIT_FORM);
+  const [editError, setEditError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -66,6 +84,48 @@ export default function EquipmentDetailScreen({ route, navigation }: any) {
   const openServiceForm = () => {
     setServiceForm({ ...EMPTY_SERVICE, serviceDate: new Date().toISOString().slice(0, 10) });
     setServiceModal(true);
+  };
+
+  const openEditModal = () => {
+    if (!equipment) return;
+    setEditForm({
+      name: equipment.name,
+      category: equipment.category,
+      brand: equipment.brand || '',
+      model: equipment.model || '',
+      nextServiceDate: equipment.nextServiceDate ? equipment.nextServiceDate.slice(0, 10) : '',
+      condition: equipment.condition,
+      notes: equipment.notes || '',
+    });
+    setEditError('');
+    setEditModal(true);
+  };
+
+  const saveEquipmentEdit = async () => {
+    if (!editForm.name.trim()) {
+      setEditError('Give this equipment a name.');
+      return;
+    }
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      const payload = {
+        name: editForm.name.trim(),
+        category: editForm.category,
+        brand: editForm.brand.trim() || undefined,
+        model: editForm.model.trim() || undefined,
+        nextServiceDate: editForm.nextServiceDate.trim() || undefined,
+        condition: editForm.condition,
+        notes: editForm.notes.trim() || undefined,
+      };
+      const response = await API.patch<Equipment>(`/equipment/${equipmentId}`, payload);
+      setEquipment(response.data);
+      setEditModal(false);
+    } catch {
+      setEditError('We could not save your changes.');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const saveService = async () => {
@@ -124,7 +184,7 @@ export default function EquipmentDetailScreen({ route, navigation }: any) {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}><TouchableOpacity accessibilityLabel="Back to equipment" onPress={() => navigation.goBack()}><Text style={styles.backText}>‹ Equipment</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" style={styles.editButton} onPress={() => navigation.goBack()}><Text style={styles.editText}>Edit item</Text></TouchableOpacity></View>
+        <View style={styles.header}><TouchableOpacity accessibilityLabel="Back to equipment" onPress={() => navigation.goBack()}><Text style={styles.backText}>‹ Equipment</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" style={styles.editButton} onPress={openEditModal}><Text style={styles.editText}>Edit item</Text></TouchableOpacity></View>
         <View style={styles.hero}><View style={styles.heroCopy}><Text style={styles.eyebrow}>{equipment.category}</Text><Text style={styles.title}>{equipment.name}</Text><Text style={styles.subtitle}>{[equipment.brand, equipment.model].filter(Boolean).join(' ') || 'Brand and model not specified'}</Text></View><View style={styles.statusBadge}><Text style={styles.statusText}>{equipment.condition === 'service_due' ? 'Service due' : equipment.condition === 'retired' ? 'Retired' : 'Ready'}</Text></View></View>
         {error ? <Text accessibilityRole="alert" style={styles.inlineError}>{error}</Text> : null}
         <View style={styles.tabs}>{(['overview', 'maintenance', 'packing'] as Tab[]).map((value) => <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: tab === value }} key={value} onPress={() => setTab(value)} style={[styles.tab, tab === value && styles.tabActive]}><Text style={[styles.tabText, tab === value && styles.tabTextActive]}>{value === 'overview' ? 'Overview' : value === 'maintenance' ? 'Maintenance' : 'Packing list'}</Text></TouchableOpacity>)}</View>
@@ -136,7 +196,102 @@ export default function EquipmentDetailScreen({ route, navigation }: any) {
         {tab === 'packing' ? <View style={styles.panel}><Text style={styles.panelTitle}>Add this item to a trip or dive</Text><Text style={styles.helper}>Choose a context to track whether this equipment is packed.</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.contextRow}>{contexts.length ? contexts.map((context) => <TouchableOpacity key={context.key} style={[styles.contextChip, selectedContext?.key === context.key && styles.contextChipActive]} onPress={() => setContextKey(context.key)}><Text style={[styles.contextLabel, selectedContext?.key === context.key && styles.contextLabelActive]} numberOfLines={1}>{context.label}</Text><Text style={[styles.contextDetail, selectedContext?.key === context.key && styles.contextDetailActive]}>{context.detail}</Text></TouchableOpacity>) : <Text style={styles.emptyText}>Create a planned dive or trip first.</Text>}</ScrollView>{selectedContext ? <View style={styles.packPanel}><Text style={styles.packContextTitle}>{selectedContext.label}</Text><Text style={styles.notes}>{selectedContext.detail}</Text><TouchableOpacity style={[styles.packToggle, selectedPack?.packed && styles.packToggleActive]} onPress={togglePack}><Text style={[styles.packToggleText, selectedPack?.packed && styles.packToggleTextActive]}>{selectedPack?.packed ? '✓ Packed for this context' : selectedPack ? 'Mark as packed' : 'Add to packing list'}</Text></TouchableOpacity></View> : null}</View> : null}
       </ScrollView>
 
-      <Modal visible={serviceModal} transparent animationType="slide" onRequestClose={() => setServiceModal(false)}><View style={styles.modalBackdrop}><View style={styles.modalCard}><ScrollView keyboardShouldPersistTaps="handled"><View style={styles.modalHeader}><Text style={styles.modalTitle}>Add service record</Text><TouchableOpacity accessibilityLabel="Close service form" onPress={() => setServiceModal(false)}><Text style={styles.closeText}>×</Text></TouchableOpacity></View><Text style={styles.fieldLabel}>Service date *</Text><TextInput value={serviceForm.serviceDate} onChangeText={(value) => setServiceForm((current) => ({ ...current, serviceDate: value }))} placeholder="YYYY-MM-DD" style={styles.input} /><Text style={styles.fieldLabel}>Service type *</Text><TextInput value={serviceForm.serviceType} onChangeText={(value) => setServiceForm((current) => ({ ...current, serviceType: value }))} placeholder="Annual inspection" style={styles.input} /><Text style={styles.fieldLabel}>Next due date</Text><TextInput value={serviceForm.nextDueDate} onChangeText={(value) => setServiceForm((current) => ({ ...current, nextDueDate: value }))} placeholder="YYYY-MM-DD" style={styles.input} /><View style={styles.formRow}><View style={styles.formHalf}><Text style={styles.fieldLabel}>Provider</Text><TextInput value={serviceForm.provider} onChangeText={(value) => setServiceForm((current) => ({ ...current, provider: value }))} placeholder="Dive centre" style={styles.input} /></View><View style={styles.formHalf}><Text style={styles.fieldLabel}>Cost</Text><TextInput value={serviceForm.cost} onChangeText={(value) => setServiceForm((current) => ({ ...current, cost: value }))} placeholder="0" keyboardType="decimal-pad" style={styles.input} /></View></View><Text style={styles.fieldLabel}>Notes</Text><TextInput value={serviceForm.notes} onChangeText={(value) => setServiceForm((current) => ({ ...current, notes: value }))} multiline placeholder="What was checked?" style={[styles.input, styles.notesInput]} /><View style={styles.modalActions}><TouchableOpacity style={styles.cancelButton} onPress={() => setServiceModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity><TouchableOpacity disabled={savingService} style={[styles.primaryButton, savingService && styles.disabledButton]} onPress={saveService}><Text style={styles.primaryButtonText}>{savingService ? 'Saving…' : 'Save record'}</Text></TouchableOpacity></View></ScrollView></View></View></Modal>
+      <Modal visible={serviceModal} transparent animationType="slide" onRequestClose={() => setServiceModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add service record</Text>
+                <TouchableOpacity accessibilityLabel="Close service form" onPress={() => setServiceModal(false)}>
+                  <Text style={styles.closeText}>×</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.fieldLabel}>Service date *</Text>
+              <TextInput value={serviceForm.serviceDate} onChangeText={(value) => setServiceForm((current) => ({ ...current, serviceDate: value }))} placeholder="YYYY-MM-DD" style={styles.input} />
+              <Text style={styles.fieldLabel}>Service type *</Text>
+              <TextInput value={serviceForm.serviceType} onChangeText={(value) => setServiceForm((current) => ({ ...current, serviceType: value }))} placeholder="Annual inspection" style={styles.input} />
+              <Text style={styles.fieldLabel}>Next due date</Text>
+              <TextInput value={serviceForm.nextDueDate} onChangeText={(value) => setServiceForm((current) => ({ ...current, nextDueDate: value }))} placeholder="YYYY-MM-DD" style={styles.input} />
+              <View style={styles.formRow}>
+                <View style={styles.formHalf}>
+                  <Text style={styles.fieldLabel}>Provider</Text>
+                  <TextInput value={serviceForm.provider} onChangeText={(value) => setServiceForm((current) => ({ ...current, provider: value }))} placeholder="Dive centre" style={styles.input} />
+                </View>
+                <View style={styles.formHalf}>
+                  <Text style={styles.fieldLabel}>Cost</Text>
+                  <TextInput value={serviceForm.cost} onChangeText={(value) => setServiceForm((current) => ({ ...current, cost: value }))} placeholder="0" keyboardType="decimal-pad" style={styles.input} />
+                </View>
+              </View>
+              <Text style={styles.fieldLabel}>Notes</Text>
+              <TextInput value={serviceForm.notes} onChangeText={(value) => setServiceForm((current) => ({ ...current, notes: value }))} multiline placeholder="What was checked?" style={[styles.input, styles.notesInput]} />
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelButton} onPress={() => setServiceModal(false)}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity disabled={savingService} style={[styles.primaryButton, savingService && styles.disabledButton]} onPress={saveService}>
+                  <Text style={styles.primaryButtonText}>{savingService ? 'Saving…' : 'Save record'}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={editModal} transparent animationType="slide" onRequestClose={() => setEditModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit equipment</Text>
+                <TouchableOpacity accessibilityLabel="Close equipment form" onPress={() => setEditModal(false)}>
+                  <Text style={styles.closeText}>×</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.fieldLabel}>Name *</Text>
+              <TextInput accessibilityLabel="Equipment name" value={editForm.name} onChangeText={(value) => setEditForm((current) => ({ ...current, name: value }))} placeholder="Equipment name" style={styles.input} />
+              <Text style={styles.fieldLabel}>Category</Text>
+              <View style={styles.modalChipRow}>
+                {CATEGORIES.map((value) => (
+                  <TouchableOpacity key={value} onPress={() => setEditForm((current) => ({ ...current, category: value }))} style={[styles.modalChip, editForm.category === value && styles.modalChipActive]}>
+                    <Text style={[styles.modalChipText, editForm.category === value && styles.modalChipTextActive]}>{value}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.formRow}>
+                <View style={styles.formHalf}>
+                  <Text style={styles.fieldLabel}>Brand</Text>
+                  <TextInput accessibilityLabel="Equipment brand" value={editForm.brand} onChangeText={(value) => setEditForm((current) => ({ ...current, brand: value }))} placeholder="Brand" style={styles.input} />
+                </View>
+                <View style={styles.formHalf}>
+                  <Text style={styles.fieldLabel}>Model</Text>
+                  <TextInput accessibilityLabel="Equipment model" value={editForm.model} onChangeText={(value) => setEditForm((current) => ({ ...current, model: value }))} placeholder="Model" style={styles.input} />
+                </View>
+              </View>
+              <Text style={styles.fieldLabel}>Next service date</Text>
+              <TextInput accessibilityLabel="Next service date" value={editForm.nextServiceDate} onChangeText={(value) => setEditForm((current) => ({ ...current, nextServiceDate: value }))} placeholder="YYYY-MM-DD" style={styles.input} />
+              <Text style={styles.fieldLabel}>Condition</Text>
+              <View style={styles.modalChipRow}>
+                {CONDITIONS.map((value) => (
+                  <TouchableOpacity key={value} onPress={() => setEditForm((current) => ({ ...current, condition: value }))} style={[styles.modalChip, editForm.condition === value && styles.modalChipActive]}>
+                    <Text style={[styles.modalChipText, editForm.condition === value && styles.modalChipTextActive]}>{CONDITION_LABELS[value]}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.fieldLabel}>Notes</Text>
+              <TextInput accessibilityLabel="Equipment notes" value={editForm.notes} onChangeText={(value) => setEditForm((current) => ({ ...current, notes: value }))} placeholder="Notes..." multiline style={[styles.input, styles.notesInput]} />
+              {editError ? <Text accessibilityRole="alert" style={styles.formError}>{editError}</Text> : null}
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelButton} onPress={() => setEditModal(false)}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity disabled={savingEdit} style={[styles.primaryButton, savingEdit && styles.disabledButton]} onPress={saveEquipmentEdit}>
+                  <Text style={styles.primaryButtonText}>{savingEdit ? 'Saving…' : 'Save changes'}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -192,7 +347,7 @@ const styles = StyleSheet.create({
   emptyText: { color: '#6a7d8d', textAlign: 'center', marginTop: 7 },
   helper: { color: '#6a7d8d', marginTop: 6 },
   contextRow: { gap: 9, paddingVertical: 15 },
-  contextChip: { width: 180, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 12, padding: 11, backgroundColor: '#fff' },
+  contextChip: { width: 180, flexShrink: 0, borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 12, padding: 11, backgroundColor: '#fff' },
   contextChipActive: { backgroundColor: '#e7f6fb', borderColor: '#0077CC' },
   contextLabel: { color: '#164c67', fontWeight: 'bold', fontSize: 13 },
   contextLabelActive: { color: '#0077CC' },
@@ -211,9 +366,15 @@ const styles = StyleSheet.create({
   closeText: { color: '#6e8794', fontSize: 27, lineHeight: 23 },
   fieldLabel: { color: '#0077CC', fontSize: 12, fontWeight: 'bold', marginTop: 14, marginBottom: 5 },
   input: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#334155', fontSize: 14 },
-  formRow: { flexDirection: 'row', gap: 10 },
-  formHalf: { flex: 1 },
+  modalChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, width: '100%' },
+  modalChip: { borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 15, paddingHorizontal: 12, paddingVertical: 7 },
+  modalChipActive: { backgroundColor: '#0077CC', borderColor: '#0077CC' },
+  modalChipText: { color: '#0077CC', fontSize: 12 },
+  modalChipTextActive: { color: '#fff', fontWeight: 'bold' },
+  formRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, width: '100%' },
+  formHalf: { flex: 1, minWidth: 200 },
   notesInput: { minHeight: 78, textAlignVertical: 'top' },
+  formError: { color: '#b34b44', marginTop: 12, textAlign: 'center' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 20 },
   cancelButton: { paddingHorizontal: 14, paddingVertical: 11 },
   cancelText: { color: '#637789', fontWeight: 'bold' },

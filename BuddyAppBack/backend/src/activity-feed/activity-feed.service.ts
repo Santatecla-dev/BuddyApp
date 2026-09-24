@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Dive } from '../dives/dive.entity';
@@ -10,6 +10,7 @@ import { FeedComment } from './feed-comment.entity';
 import { FeedReaction } from './feed-reaction.entity';
 import { CreateFeedCommentDto } from './dto/create-feed-comment.dto';
 import { AchievementsService } from '../achievements/achievements.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type FeedType = 'all' | 'dives' | 'wildlife' | 'achievements' | 'mine';
 type FeedItem = {
@@ -37,7 +38,49 @@ export class ActivityFeedService {
     @InjectRepository(FeedComment) private readonly commentRepo: Repository<FeedComment>,
     @InjectRepository(FeedReaction) private readonly reactionRepo: Repository<FeedReaction>,
     private readonly achievementsService: AchievementsService,
+    @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
+
+  private async getActivityRecipient(activityId: string) {
+    const achievementMatch = /^achievement-(\d+)-(.+)$/.exec(activityId);
+    if (achievementMatch) return Number(achievementMatch[1]);
+    const match = /^(dive|sighting)-(\d+)(?:-(\d+))?$/.exec(activityId);
+    if (!match) return null;
+    if (match[1] === 'sighting') {
+      if (match[3]) return Number(match[3]);
+      const sighting = await this.sightingRepo.findOne({ where: { id: Number(match[2]) } });
+      return sighting?.createdByUserId || null;
+    }
+    const buddies = await this.buddyRepo.find({ where: { diveId: Number(match[2]) }, order: { joinedAt: 'ASC' } });
+    return buddies[0]?.userId || null;
+  }
+
+  private async syncFeedNotifications(userId: number, feedItems: FeedItem[]) {
+    const notificationsService = this.notificationsService;
+    if (!notificationsService) return;
+    await Promise.all(feedItems.filter((item) => item.actor.id !== userId).map((item) => {
+      const title = item.type === 'dive'
+        ? 'New dive in your network'
+        : item.type === 'sighting'
+          ? 'New marine life sighting'
+          : 'New achievement';
+      const body = item.type === 'dive'
+        ? `${item.actor.name} logged a dive at ${item.dive?.location || 'a dive site'}.`
+        : item.type === 'sighting'
+          ? `${item.actor.name} spotted ${item.species?.name || 'a new species'}.`
+          : `${item.actor.name} unlocked ${item.achievement?.title || 'an achievement'}.`;
+      return notificationsService.create({
+        recipientId: userId,
+        actorId: item.actor.id,
+        type: item.type,
+        title,
+        body,
+        entityType: 'activity',
+        entityId: item.id,
+        dedupeKey: `feed:${userId}:${item.id}`,
+      }).catch(() => undefined);
+    }));
+  }
 
   private async getNetworkUserIds(userId: number) {
     const memberships = await this.buddyRepo.find({ where: { userId } });
@@ -207,6 +250,7 @@ export class ActivityFeedService {
     const reacted = new Set(reactions.filter((reaction) => reaction.userId === userId).map((reaction) => reaction.activityId));
     page.forEach((item) => { item.reactionsCount = reactionCounts.get(item.id) || 0; item.commentsCount = commentCounts.get(item.id) || 0; item.reactedByMe = reacted.has(item.id); item.commentsPreview = commentPreviews.get(item.id) || []; });
     const nextOffset = offset + page.length;
+    await this.syncFeedNotifications(userId, page);
     return { items: page, nextCursor: nextOffset < items.length ? String(nextOffset) : null, hasMore: nextOffset < items.length };
   }
 
@@ -218,6 +262,21 @@ export class ActivityFeedService {
       return { reacted: false };
     }
     await this.reactionRepo.save(this.reactionRepo.create({ activityId, userId }));
+    const recipientId = await this.getActivityRecipient(activityId);
+    if (recipientId && recipientId !== userId) {
+      try {
+        await this.notificationsService?.create({
+          recipientId,
+          actorId: userId,
+          type: 'reaction',
+          title: 'New reaction',
+          body: 'Someone reacted to your activity.',
+          entityType: 'activity',
+          entityId: activityId,
+          dedupeKey: `reaction:${activityId}:${userId}`,
+        });
+      } catch {}
+    }
     return { reacted: true };
   }
 
@@ -231,6 +290,20 @@ export class ActivityFeedService {
     await this.ensureActivityAccess(activityId, userId);
     const saved = await this.commentRepo.save(this.commentRepo.create({ activityId, userId, body: dto.body.trim() }));
     const user = await this.userRepo.findOne({ where: { id: userId } });
+    const recipientId = await this.getActivityRecipient(activityId);
+    if (recipientId && recipientId !== userId) {
+      try {
+        await this.notificationsService?.create({
+          recipientId,
+          actorId: userId,
+          type: 'comment',
+          title: 'New comment',
+          body: `${user?.name || 'A buddy'} commented on your activity.`,
+          entityType: 'activity',
+          entityId: activityId,
+        });
+      } catch {}
+    }
     return { id: saved.id, body: saved.body, createdAt: saved.createdAt, user: { id: userId, name: user?.name || 'Buddy' } };
   }
 }

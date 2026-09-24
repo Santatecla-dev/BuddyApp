@@ -14,9 +14,10 @@ import { DiveTrip } from './dive-trip.entity';
 import { TripPlannedDive } from './trip-planned-dive.entity';
 import { DiveTripsController } from './dive-trips.controller';
 import { DiveTripsService } from './dive-trips.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Dive, DiveBuddy, DiveInvite, DiveSighting, PlannedDive, DiveTrip, TripPlannedDive])],
+  imports: [NotificationsModule, TypeOrmModule.forFeature([Dive, DiveBuddy, DiveInvite, DiveSighting, PlannedDive, DiveTrip, TripPlannedDive])],
   providers: [DivesService, PlannedDivesService, DiveTripsService],
   controllers: [DivesController, PokedexController, PlannedDivesController, DiveTripsController],
 })

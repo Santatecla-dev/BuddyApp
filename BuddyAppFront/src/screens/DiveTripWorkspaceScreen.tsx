@@ -106,14 +106,13 @@ export default function DiveTripWorkspaceScreen({ navigation, route }: any) {
         </View>
 
         <View style={styles.panel}>
-          <Text style={styles.panelTitle}>Add a planned dive</Text>
-          <Text style={styles.helper}>Only planned dives inside this trip's dates can be added.</Text>
+          <View style={styles.addPanelHeading}><View style={styles.planHeadingCopy}><Text style={styles.panelTitle}>Add a planned dive</Text><Text style={styles.helper}>Only planned dives inside this trip's dates can be added.</Text></View><TouchableOpacity accessibilityRole="button" style={styles.planForTripButton} onPress={() => navigation.navigate('PlanDive', { tripId })}><Text style={styles.planForTripText}>+ Plan for trip</Text></TouchableOpacity></View>
           {availablePlans.length ? availablePlans.map((plan) => (
             <View key={plan.id} style={styles.availableRow}>
               <View style={styles.planCopy}><Text style={styles.planTitle}>{plan.location}</Text><Text style={styles.planMeta}>{formatDate(plan.date)} · {plan.country}</Text></View>
               <TouchableOpacity accessibilityRole="button" disabled={busyId === plan.id} style={[styles.addButton, busyId === plan.id && styles.disabled]} onPress={() => attach(plan)}><Text style={styles.addText}>{busyId === plan.id ? 'Adding…' : 'Add'}</Text></TouchableOpacity>
             </View>
-          )) : <Text style={styles.muted}>There are no matching planned dives available.</Text>}
+          )) : <View style={styles.noAvailable}><Text style={styles.muted}>There are no matching planned dives available.</Text><TouchableOpacity accessibilityRole="button" style={styles.secondaryButton} onPress={() => navigation.navigate('PlanDive', { tripId })}><Text style={styles.secondaryButtonText}>Create a dive for this trip</Text></TouchableOpacity></View>}
         </View>
 
         <View style={styles.notesPanel}><Text style={styles.panelTitle}>Trip notes</Text><Text style={styles.notes}>{trip.notes || 'No notes added for this trip.'}</Text></View>
@@ -139,6 +138,10 @@ const styles = StyleSheet.create({
   summaryLabel: { color: '#728396', fontSize: 12, marginTop: 3 },
   panel: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 18, padding: 20, marginBottom: 16 },
   panelHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  addPanelHeading: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  planHeadingCopy: { flex: 1, minWidth: 0 },
+  planForTripButton: { borderWidth: 1, borderColor: '#0077CC', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
+  planForTripText: { color: '#0077CC', fontSize: 12, fontWeight: 'bold' },
   panelTitle: { color: '#1e293b', fontSize: 19, fontWeight: 'bold' },
   count: { color: '#00A8A8', fontWeight: 'bold' },
   itineraryRow: { minHeight: 70, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#edf2f5', marginTop: 13, paddingTop: 13, gap: 12 },
@@ -155,6 +158,7 @@ const styles = StyleSheet.create({
   addButton: { borderWidth: 1, borderColor: '#00A8A8', borderRadius: 19, paddingHorizontal: 14, paddingVertical: 9 },
   addText: { color: '#008d8d', fontWeight: 'bold' },
   muted: { color: '#728396', marginTop: 14 },
+  noAvailable: { alignItems: 'flex-start' },
   notesPanel: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbe6ee', borderRadius: 18, padding: 20, marginBottom: 16 },
   notes: { color: '#526577', fontSize: 14, lineHeight: 21, marginTop: 11 },
   deleteButton: { alignSelf: 'flex-start', borderWidth: 1, borderColor: '#d59696', borderRadius: 21, paddingHorizontal: 16, paddingVertical: 10 },

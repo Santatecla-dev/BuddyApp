@@ -17,7 +17,8 @@ import { CHECKLIST, ChecklistItem } from '../utils/plannedDiveChecklist';
 const CONDITIONS = ['Calm', 'Good', 'Choppy', 'Low visibility'];
 const GAS_OPTIONS = ['Air', 'Nitrox 32', 'Nitrox 36', 'Trimix'];
 
-export default function PlanDiveScreen({ navigation }: any) {
+export default function PlanDiveScreen({ navigation, route }: any) {
+  const tripId = route?.params?.tripId;
   const scrollRef = useRef<ScrollView>(null);
   const [country, setCountry] = useState('');
   const [site, setSite] = useState('');
@@ -79,7 +80,7 @@ export default function PlanDiveScreen({ navigation }: any) {
     }
     setSaving(true);
     try {
-      await API.post('/planned-dives', {
+      const response = await API.post('/planned-dives', {
         date: parsedDate.toISOString(),
         country,
         location: site.trim(),
@@ -93,7 +94,12 @@ export default function PlanDiveScreen({ navigation }: any) {
         checklist: Object.fromEntries(CHECKLIST.map(item => [item.id, !!checked[item.id]])),
       });
       setSaved(true);
-      navigation.navigate('PlannedDives');
+      if (tripId && response.data?.id) {
+        await API.post(`/dive-trips/${tripId}/planned-dives/${response.data.id}`);
+        navigation.replace('DiveTripWorkspace', { tripId });
+      } else {
+        navigation.navigate('PlannedDives');
+      }
     } catch (error: any) {
       const message = error?.response?.data?.message;
       const readableMessage = Array.isArray(message) ? message.join(' ') : message || 'Could not save this plan. Please try again.';

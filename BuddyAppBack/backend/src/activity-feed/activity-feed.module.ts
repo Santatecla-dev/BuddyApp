@@ -9,9 +9,10 @@ import { FeedComment } from './feed-comment.entity';
 import { FeedReaction } from './feed-reaction.entity';
 import { ActivityFeedController } from './activity-feed.controller';
 import { ActivityFeedService } from './activity-feed.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [AchievementsModule, TypeOrmModule.forFeature([Dive, DiveBuddy, DiveSighting, User, FeedComment, FeedReaction])],
+  imports: [AchievementsModule, NotificationsModule, TypeOrmModule.forFeature([Dive, DiveBuddy, DiveSighting, User, FeedComment, FeedReaction])],
   controllers: [ActivityFeedController],
   providers: [ActivityFeedService],
 })
