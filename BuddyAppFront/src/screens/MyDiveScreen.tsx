@@ -358,6 +358,14 @@ export default function MyDivesScreen({ navigation, route }: any) {
 
       <TouchableOpacity
         accessibilityRole="button"
+        style={[styles.statsButton, styles.actionGridButton]}
+        onPress={() => navigation.navigate('Achievements')}
+      >
+        <Text style={styles.statsButtonText}>View achievements</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        accessibilityRole="button"
         style={[styles.pokedexButton, styles.actionGridButton]}
         onPress={() => navigation.navigate('Pokedex')}
       >

@@ -16,10 +16,11 @@ import {
 import API from '../api/api';
 import { Dive, PokedexCategory, PokedexSpecies } from '../types';
 import { diveDate } from '../utils/diveStats';
+import { getNewAchievementIds, getUnlockedAchievementIds } from '../utils/achievements';
 
 const CATEGORIES: Array<'All' | PokedexCategory> = ['All', 'Sharks', 'Tropical fish', 'Macro', 'Crustaceans', 'Rays', 'Pelagic'];
 
-export default function PokedexScreen() {
+export default function PokedexScreen({ navigation }: any) {
   const { width, fontScale } = useWindowDimensions();
   const narrowLayout = width / fontScale < 480;
   const [gridWidth, setGridWidth] = useState(0);
@@ -132,12 +133,15 @@ export default function PokedexScreen() {
     setSaving(true);
     setModalError('');
     try {
+      const previousAchievements = await getUnlockedAchievementIds();
       await API.post('/pokedex/sightings', {
         speciesKey: selectedSpecies.key,
         diveIds: selectedDiveIds,
       });
+      const newAchievements = await getNewAchievementIds(previousAchievements);
       setSelectedSpecies(null);
       await loadPokedex();
+      if (newAchievements.length) navigation.navigate('Achievements', { celebrateIds: newAchievements, celebrationKey: String(Date.now()) });
     } catch {
       setModalError('Could not save this sighting. Please try again.');
     } finally {

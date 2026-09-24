@@ -65,6 +65,75 @@ export interface DiveTrip {
   plannedDives: PlannedDive[];
 }
 
+export type EquipmentCondition = 'good' | 'service_due' | 'retired';
+
+export interface Equipment {
+  id: number;
+  userId: number;
+  name: string;
+  category: string;
+  brand?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  purchaseDate?: string | null;
+  nextServiceDate?: string | null;
+  condition: EquipmentCondition;
+  packed: boolean;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EquipmentServiceRecord {
+  id: number;
+  userId: number;
+  equipmentId: number;
+  serviceDate: string;
+  nextDueDate?: string | null;
+  serviceType: string;
+  provider?: string | null;
+  cost?: number | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface EquipmentPacking {
+  id: number;
+  userId: number;
+  equipmentId: number;
+  tripId?: number | null;
+  plannedDiveId?: number | null;
+  packed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AchievementCategory = 'dives' | 'wildlife' | 'exploration';
+export type AchievementTier = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+export interface AchievementEvidence {
+  kind: 'dive' | 'species' | 'country';
+  label: string;
+  id?: number;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: AchievementCategory;
+  tier: AchievementTier;
+  target: number;
+  progress: number;
+  unlocked: boolean;
+  everUnlocked?: boolean;
+  unlockedAt?: string | null;
+  pinned?: boolean;
+  evidence?: AchievementEvidence[];
+  evidenceCount?: number;
+}
+
 export type PokedexCategory = 'Sharks' | 'Tropical fish' | 'Macro' | 'Crustaceans' | 'Rays' | 'Pelagic';
 
 export interface PokedexSpecies {

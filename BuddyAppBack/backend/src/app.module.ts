@@ -5,6 +5,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AppController } from './app.controller';
 import { DivesModule } from './dives/dives.module';
+import { EquipmentModule } from './equipment/equipment.module';
+import { AchievementsModule } from './achievements/achievements.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { DivesModule } from './dives/dives.module';
     UsersModule,
     AuthModule,
     DivesModule,
+    EquipmentModule,
+    AchievementsModule,
   ],
   controllers: [AppController],
   providers: [],

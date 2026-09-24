@@ -17,6 +17,9 @@ import DiveTripsScreen from './src/screens/DiveTripsScreen';
 import DiveTripWorkspaceScreen from './src/screens/DiveTripWorkspaceScreen';
 import DiveMapScreen from './src/screens/DiveMapScreen';
 import DiveActivityScreen from './src/screens/DiveActivityScreen';
+import EquipmentScreen from './src/screens/EquipmentScreen';
+import EquipmentDetailScreen from './src/screens/EquipmentDetailScreen';
+import AchievementsScreen from './src/screens/AchievementsScreen';
 import PokedexScreen from './src/screens/PokedexScreen';
 
 const Stack = createNativeStackNavigator();
@@ -47,6 +50,9 @@ export default function App() {
         <Stack.Screen name="DiveTripWorkspace" component={DiveTripWorkspaceScreen} options={{ title: 'Trip workspace' }} />
         <Stack.Screen name="DiveMap" component={DiveMapScreen} options={{ title: 'Dive map' }} />
         <Stack.Screen name="DiveActivity" component={DiveActivityScreen} options={{ title: 'Dive activity' }} />
+        <Stack.Screen name="Equipment" component={EquipmentScreen} options={{ title: 'My equipment' }} />
+        <Stack.Screen name="EquipmentDetail" component={EquipmentDetailScreen} options={{ title: 'Equipment detail' }} />
+        <Stack.Screen name="Achievements" component={AchievementsScreen} options={{ title: 'Achievements' }} />
         <Stack.Screen name="Pokedex" component={PokedexScreen} options={{ title: 'Pokedex' }} />
       </Stack.Navigator>
     </NavigationContainer>

@@ -11,6 +11,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import API from '../api/api';
 import { PlannedDive } from '../types';
 import { CHECKLIST, completeChecklist } from '../utils/plannedDiveChecklist';
+import { getNewAchievementIds, getUnlockedAchievementIds } from '../utils/achievements';
 
 const CHECKLIST_LABELS: Record<string, string> = Object.fromEntries(CHECKLIST.map(item => [item.id, item.label]));
 
@@ -50,8 +51,11 @@ export default function PlannedDiveDetailScreen({ navigation, route }: any) {
     setActionError('');
     setBusy(true);
     try {
+      const previousAchievements = await getUnlockedAchievementIds();
       await API.post(`/planned-dives/${plan.id}/log`);
-      navigation.replace('MyDives');
+      const newAchievements = await getNewAchievementIds(previousAchievements);
+      if (newAchievements.length) navigation.replace('Achievements', { celebrateIds: newAchievements, celebrationKey: String(Date.now()) });
+      else navigation.replace('MyDives');
     } catch (requestError: any) {
       const message = requestError?.response?.data?.message;
       setActionError(Array.isArray(message) ? message.join(' ') : message || 'Could not log this dive. Please try again.');

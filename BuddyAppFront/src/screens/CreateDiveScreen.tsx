@@ -14,6 +14,7 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import API from '../api/api';
 import { PokedexSpecies } from '../types';
+import { getNewAchievementIds, getUnlockedAchievementIds } from '../utils/achievements';
 
 export const COUNTRIES = [
   'Afghanistan','Albania','Algeria','Andorra','Angola','Antigua and Barbuda','Argentina','Armenia','Australia','Austria','Azerbaijan',
@@ -92,6 +93,7 @@ export default function CreateDiveScreen({ navigation }: any) {
     dateObj.setHours(Number(hour || 0), 0, 0, 0);
 
     try {
+      const previousAchievements = await getUnlockedAchievementIds();
       await API.post('/dives', {
         country,
         location: location.trim(),
@@ -102,7 +104,9 @@ export default function CreateDiveScreen({ navigation }: any) {
         sightings,
       });
 
-      navigation.navigate('MyDives');
+      const newAchievements = await getNewAchievementIds(previousAchievements);
+      if (newAchievements.length) navigation.navigate('Achievements', { celebrateIds: newAchievements, celebrationKey: String(Date.now()) });
+      else navigation.navigate('MyDives');
     } catch {
       setSubmitError('Could not create dive. Please try again.');
     } finally {

@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import API from '../api/api';
+import { Achievement } from '../types';
 
 type Profile = {
   id: number;
@@ -20,7 +21,7 @@ type Profile = {
   dives?: { userId: number }[];
 };
 
-export default function ProfileScreen({ route }: any) {
+export default function ProfileScreen({ route, navigation }: any) {
   const viewedUserId: number | null = route?.params?.userId ?? null;
   const isOwnProfile = viewedUserId === null;
 
@@ -35,6 +36,7 @@ export default function ProfileScreen({ route }: any) {
 
   const [totalDives, setTotalDives] = useState<number | null>(null);
   const [divesWithMe, setDivesWithMe] = useState<number | null>(null);
+  const [pinnedAchievements, setPinnedAchievements] = useState<Achievement[]>([]);
 
   const fetchProfile = async () => {
     try {
@@ -49,7 +51,15 @@ export default function ProfileScreen({ route }: any) {
       setCertificationsText((data.certifications || []).join(', '));
       setTotalDives(data.totalDives);
 
-      if (!isOwnProfile) {
+      if (isOwnProfile) {
+        try {
+          const achievementsRes = await API.get<Achievement[]>('/achievements');
+          setPinnedAchievements((achievementsRes.data || []).filter((achievement) => achievement.pinned).slice(0, 3));
+        } catch {
+          setPinnedAchievements([]);
+        }
+      } else {
+        setPinnedAchievements([]);
         const sharedRes = await API.get(`/users/${viewedUserId}/shared-dives`);
         setDivesWithMe(sharedRes.data.sharedDives);
       }
@@ -64,6 +74,7 @@ export default function ProfileScreen({ route }: any) {
     setIsEditing(false);
     setErrorMessage('');
     setDivesWithMe(null);
+    setPinnedAchievements([]);
     fetchProfile();
   }, [viewedUserId]);
 
@@ -207,6 +218,33 @@ export default function ProfileScreen({ route }: any) {
         ) : (
           <Text style={styles.readOnlyNote}>This profile is read-only</Text>
         )}
+
+        {isOwnProfile ? (
+          <View style={styles.pinnedProfileCard}>
+            <View style={styles.pinnedProfileHeader}><Text style={styles.pinnedProfileTitle}>Pinned achievements</Text><TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('Achievements')}><Text style={styles.pinnedProfileLink}>See all</Text></TouchableOpacity></View>
+            {pinnedAchievements.length ? pinnedAchievements.map((achievement) => <TouchableOpacity key={achievement.id} style={styles.pinnedProfileRow} onPress={() => navigation.navigate('Achievements')}><Text style={styles.pinnedProfileIcon}>{achievement.icon}</Text><View style={styles.pinnedProfileCopy}><Text style={styles.pinnedProfileName}>{achievement.title}</Text><Text style={styles.pinnedProfileProgress}>{achievement.progress} / {achievement.target}</Text></View><Text style={styles.pinnedProfileArrow}>›</Text></TouchableOpacity>) : <Text style={styles.pinnedProfileEmpty}>Pin up to three achievements from your collection.</Text>}
+          </View>
+        ) : null}
+
+        {isOwnProfile ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={styles.equipmentButton}
+            onPress={() => navigation.navigate('Equipment')}
+          >
+            <Text style={styles.equipmentButtonText}>Manage my equipment</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {isOwnProfile ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={styles.achievementsButton}
+            onPress={() => navigation.navigate('Achievements')}
+          >
+            <Text style={styles.achievementsButtonText}>View achievements</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -343,6 +381,109 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+
+  pinnedProfileCard: {
+    backgroundColor: '#fffaf0',
+    borderWidth: 1,
+    borderColor: '#eadba8',
+    borderRadius: 16,
+    padding: 15,
+    marginTop: 14,
+  },
+
+  pinnedProfileHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  pinnedProfileTitle: {
+    color: '#164c67',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+
+  pinnedProfileLink: {
+    color: '#9a741b',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+
+  pinnedProfileRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#f0e7c9',
+    paddingVertical: 7,
+  },
+
+  pinnedProfileIcon: {
+    fontSize: 24,
+    width: 34,
+  },
+
+  pinnedProfileCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  pinnedProfileName: {
+    color: '#164c67',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+
+  pinnedProfileProgress: {
+    color: '#9a741b',
+    fontSize: 11,
+    marginTop: 2,
+  },
+
+  pinnedProfileArrow: {
+    color: '#9a741b',
+    fontSize: 22,
+    marginLeft: 8,
+  },
+
+  pinnedProfileEmpty: {
+    color: '#7a6a42',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  equipmentButton: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#00A8A8',
+    padding: 14,
+    borderRadius: 30,
+    alignItems: 'center',
+    backgroundColor: '#effafa',
+  },
+
+  equipmentButtonText: {
+    color: '#008d8d',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+
+  achievementsButton: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#d5aa43',
+    padding: 14,
+    borderRadius: 30,
+    alignItems: 'center',
+    backgroundColor: '#fff9e7',
+  },
+
+  achievementsButtonText: {
+    color: '#9a741b',
+    fontWeight: 'bold',
+    fontSize: 15,
   },
 
   readOnlyNote: {
