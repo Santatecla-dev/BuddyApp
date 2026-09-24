@@ -126,11 +126,73 @@ export class ActivityFeedService {
     if (activityType === 'all' || activityType === 'wildlife') {
       sightings.forEach((sighting) => {
         const dive = diveMap.get(sighting.diveId);
-        const actor = (isMine ? userMap.get(userId) : userMap.get(sighting.createdByUserId))
-          || userMap.get((buddiesByDive.get(sighting.diveId) || []).find((buddy) => buddy.userId !== userId)?.userId || 0);
+        const diveBuddies = buddiesByDive.get(sighting.diveId) || [];
+        const isParticipant = diveBuddies.some((buddy) => buddy.userId === userId);
         const species = getSpecies(sighting.speciesKey);
-        const belongsInFeed = isMine ? sighting.createdByUserId === userId : actor?.id !== userId;
-        if (dive && actor && belongsInFeed && (!selectedBuddyId || actor.id === selectedBuddyId) && species) items.push({ id: `sighting-${sighting.id}`, type: 'sighting', createdAt: sighting.createdAt, actor: { id: actor.id, name: actor.name }, dive: { id: dive.id, location: dive.location, country: dive.country, date: dive.date, maxDepth: dive.maxDepth, duration: dive.duration }, species, reactionsCount: 0, commentsCount: 0, reactedByMe: false, commentsPreview: [] });
+        if (!dive || !species) return;
+
+        if (isMine) {
+          // If the user participated in the dive that contains this sighting, it is part of their dive log / wildlife experience
+          const userParticipated = isParticipant || sighting.createdByUserId === userId;
+          if (userParticipated) {
+            const actor = userMap.get(userId);
+            if (actor) {
+              items.push({
+                id: `sighting-${sighting.id}`,
+                type: 'sighting',
+                createdAt: sighting.createdAt,
+                actor: { id: actor.id, name: actor.name },
+                dive: { id: dive.id, location: dive.location, country: dive.country, date: dive.date, maxDepth: dive.maxDepth, duration: dive.duration },
+                species,
+                reactionsCount: 0,
+                commentsCount: 0,
+                reactedByMe: false,
+                commentsPreview: [],
+              });
+            }
+          }
+        } else {
+          // In buddy feed:
+          // If a selectedBuddyId is specified, check if that buddy participated in the dive or created the sighting
+          if (selectedBuddyId) {
+            const buddyInDive = diveBuddies.some((buddy) => buddy.userId === selectedBuddyId) || sighting.createdByUserId === selectedBuddyId;
+            if (buddyInDive) {
+              const actor = userMap.get(selectedBuddyId);
+              if (actor) {
+                items.push({
+                  id: `sighting-${sighting.id}`,
+                  type: 'sighting',
+                  createdAt: sighting.createdAt,
+                  actor: { id: actor.id, name: actor.name },
+                  dive: { id: dive.id, location: dive.location, country: dive.country, date: dive.date, maxDepth: dive.maxDepth, duration: dive.duration },
+                  species,
+                  reactionsCount: 0,
+                  commentsCount: 0,
+                  reactedByMe: false,
+                  commentsPreview: [],
+                });
+              }
+            }
+          } else {
+            // General buddy feed: attribute to the creator if not current user, or any buddy in the dive who is not current user
+            const actor = (sighting.createdByUserId !== userId ? userMap.get(sighting.createdByUserId) : null)
+              || userMap.get(diveBuddies.find((buddy) => buddy.userId !== userId)?.userId || 0);
+            if (actor && actor.id !== userId) {
+              items.push({
+                id: `sighting-${sighting.id}`,
+                type: 'sighting',
+                createdAt: sighting.createdAt,
+                actor: { id: actor.id, name: actor.name },
+                dive: { id: dive.id, location: dive.location, country: dive.country, date: dive.date, maxDepth: dive.maxDepth, duration: dive.duration },
+                species,
+                reactionsCount: 0,
+                commentsCount: 0,
+                reactedByMe: false,
+                commentsPreview: [],
+              });
+            }
+          }
+        }
       });
     }
     if (activityType === 'all' || activityType === 'achievements') {
