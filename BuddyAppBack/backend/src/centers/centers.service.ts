@@ -14,6 +14,11 @@ import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { CreateInventoryBulkDto } from './dto/create-inventory-bulk.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { UpdateCenterProfileDto } from './dto/update-center-profile.dto';
+import { WarehouseMap } from './warehouse-map.entity';
+import { WarehouseObject } from './warehouse-object.entity';
+import { CreateWarehouseObjectDto } from './dto/create-warehouse-object.dto';
+import { UpdateWarehouseObjectDto } from './dto/update-warehouse-object.dto';
+import { UpdateWarehouseMapDto } from './dto/update-warehouse-map.dto';
 
 @Injectable()
 export class CentersService {
@@ -26,6 +31,8 @@ export class CentersService {
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(DiveInvite) private readonly invitesRepo: Repository<DiveInvite>,
     @InjectRepository(CenterLinkRequest) private readonly linkRequestsRepo: Repository<CenterLinkRequest>,
+    @InjectRepository(WarehouseMap) private readonly warehouseMapsRepo: Repository<WarehouseMap>,
+    @InjectRepository(WarehouseObject) private readonly warehouseObjectsRepo: Repository<WarehouseObject>,
   ) {}
 
   async forOwner(userId: number) {
@@ -91,6 +98,129 @@ export class CentersService {
     const values = Object.fromEntries(Object.entries(dto).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value]));
     Object.assign(center, values);
     return this.centersRepo.save(center);
+  }
+
+  async getWarehouse(userId: number) {
+    const center = await this.forOwner(userId);
+    let map = await this.warehouseMapsRepo.findOne({ where: { centerId: center.id } });
+    if (!map) map = await this.warehouseMapsRepo.save(this.warehouseMapsRepo.create({ centerId: center.id, name: 'Main warehouse', width: 24, height: 16 }));
+    const [objects, inventory] = await Promise.all([
+      this.warehouseObjectsRepo.find({ where: { mapId: map.id }, order: { y: 'ASC', x: 'ASC' } }),
+      this.inventoryRepo.find({ where: { centerId: center.id }, order: { category: 'ASC', name: 'ASC' } }),
+    ]);
+    return { map, objects, inventory };
+  }
+
+  async clearWarehouse(userId: number) {
+    const center = await this.forOwner(userId);
+    const map = await this.warehouseMapsRepo.findOne({ where: { centerId: center.id } });
+    if (!map) return { deleted: 0 };
+    const objects = await this.warehouseObjectsRepo.find({ where: { mapId: map.id } });
+    await this.inventoryRepo.update({ centerId: center.id }, { warehouseObjectId: null });
+    if (objects.length) await this.warehouseObjectsRepo.remove(objects);
+    return { deleted: objects.length };
+  }
+
+  async updateWarehouse(userId: number, dto: UpdateWarehouseMapDto) {
+    const center = await this.forOwner(userId);
+    const map = await this.warehouseMapsRepo.findOne({ where: { centerId: center.id } });
+    if (!map) throw new NotFoundException('Warehouse map not found');
+    const nextWidth = dto.width ?? map.width;
+    const nextHeight = dto.height ?? map.height;
+    const objects = await this.warehouseObjectsRepo.find({ where: { mapId: map.id } });
+    if (objects.some((object) => {
+      const bounds = this.rotatedBounds(object);
+      return object.x + bounds.width > nextWidth || object.y + bounds.height > nextHeight;
+    })) {
+      throw new BadRequestException('The new warehouse dimensions would cut off one or more objects. Move them first.');
+    }
+    Object.assign(map, dto, { ...(dto.name !== undefined ? { name: dto.name.trim() } : {}) });
+    return this.warehouseMapsRepo.save(map);
+  }
+
+  private rotatedBounds(object: WarehouseObject) {
+    const angle = ((object.rotation ?? 0) % 180 + 180) % 180;
+    if (angle === 90) return { width: object.height, height: object.width };
+    if (angle === 45 || angle === 135) {
+      const diagonal = Math.ceil((object.width + object.height) / Math.sqrt(2));
+      return { width: diagonal, height: diagonal };
+    }
+    return { width: object.width, height: object.height };
+  }
+
+  private assertWarehouseObjectFits(candidate: WarehouseObject, map: WarehouseMap, objects: WarehouseObject[]) {
+    const candidateBounds = this.rotatedBounds(candidate);
+    if (candidate.x < 0 || candidate.y < 0 || candidate.width < 1 || candidate.height < 1 || candidate.x + candidateBounds.width > map.width || candidate.y + candidateBounds.height > map.height) {
+      throw new BadRequestException('This object must stay inside the warehouse boundaries.');
+    }
+    const overlaps = objects.some((other) => other.id !== candidate.id
+      && candidate.x < other.x + this.rotatedBounds(other).width
+      && candidate.x + candidateBounds.width > other.x
+      && candidate.y < other.y + this.rotatedBounds(other).height
+      && candidate.y + candidateBounds.height > other.y);
+    if (overlaps) throw new BadRequestException('This object overlaps another warehouse object. Choose a free area.');
+  }
+
+  async createWarehouseObject(userId: number, dto: CreateWarehouseObjectDto) {
+    const warehouse = await this.getWarehouse(userId);
+    const width = dto.width ?? (dto.type === 'zone' ? 6 : 4);
+    const height = dto.type === 'compressor' ? width : dto.height ?? (dto.type === 'zone' ? 4 : 2);
+    const object = this.warehouseObjectsRepo.create({
+      mapId: warehouse.map.id,
+      type: dto.type,
+      label: dto.label.trim(),
+      x: dto.x ?? 0,
+      y: dto.y ?? 0,
+      width,
+      height,
+      rotation: dto.rotation ?? 0,
+      color: dto.color || '#123b52',
+      notes: dto.notes?.trim() || null,
+    });
+    if (dto.x === undefined && dto.y === undefined) {
+      let placed = false;
+      for (let y = 0; y <= warehouse.map.height - 1 && !placed; y += 1) {
+        for (let x = 0; x <= warehouse.map.width - 1 && !placed; x += 1) {
+          object.x = x;
+          object.y = y;
+          try {
+            this.assertWarehouseObjectFits(object, warehouse.map, warehouse.objects);
+            placed = true;
+          } catch (error) {
+            if (!(error instanceof BadRequestException)) throw error;
+          }
+        }
+      }
+      if (!placed) throw new BadRequestException('There is no free space for another object on this warehouse map.');
+    }
+    this.assertWarehouseObjectFits(object, warehouse.map, warehouse.objects);
+    return this.warehouseObjectsRepo.save(object);
+  }
+
+  async updateWarehouseObject(id: number, userId: number, dto: UpdateWarehouseObjectDto) {
+    const warehouse = await this.getWarehouse(userId);
+    const object = await this.warehouseObjectsRepo.findOne({ where: { id, mapId: warehouse.map.id } });
+    if (!object) throw new NotFoundException('Warehouse object not found');
+    const nextType = dto.type ?? object.type;
+    const requestedCompressorSize = dto.width ?? dto.height;
+    const compressorSize = nextType === 'compressor' ? requestedCompressorSize ?? Math.max(object.width, object.height) : undefined;
+    Object.assign(object, dto, {
+      ...(dto.label !== undefined ? { label: dto.label.trim() } : {}),
+      ...(dto.notes !== undefined ? { notes: dto.notes.trim() || null } : {}),
+      ...(compressorSize !== undefined ? { width: compressorSize, height: compressorSize } : {}),
+    });
+    const objects = await this.warehouseObjectsRepo.find({ where: { mapId: warehouse.map.id } });
+    this.assertWarehouseObjectFits(object, warehouse.map, objects);
+    return this.warehouseObjectsRepo.save(object);
+  }
+
+  async removeWarehouseObject(id: number, userId: number) {
+    const warehouse = await this.getWarehouse(userId);
+    const object = await this.warehouseObjectsRepo.findOne({ where: { id, mapId: warehouse.map.id } });
+    if (!object) throw new NotFoundException('Warehouse object not found');
+    await this.inventoryRepo.update({ centerId: (await this.forOwner(userId)).id, warehouseObjectId: id }, { warehouseObjectId: null });
+    await this.warehouseObjectsRepo.remove(object);
+    return { deleted: true };
   }
 
   async createDive(userId: number, dto: CreateCenterDiveDto) {
@@ -223,6 +353,12 @@ export class CentersService {
 
   async updateInventory(id: number, userId: number, dto: UpdateInventoryItemDto) {
     const item = await this.ownedInventory(id, userId);
+    if (dto.warehouseObjectId !== undefined && dto.warehouseObjectId !== null) {
+      const center = await this.forOwner(userId);
+      const map = await this.warehouseMapsRepo.findOne({ where: { centerId: center.id } });
+      const warehouseObject = map ? await this.warehouseObjectsRepo.findOne({ where: { id: dto.warehouseObjectId, mapId: map.id } }) : null;
+      if (!warehouseObject) throw new BadRequestException('This inventory location does not belong to your warehouse.');
+    }
     Object.assign(item, dto, {
       ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
       ...(dto.category !== undefined ? { category: dto.category.trim() } : {}),

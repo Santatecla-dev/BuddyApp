@@ -11,9 +11,11 @@ import { CentersController, DiveCentersController } from './centers.controller';
 import { CentersService } from './centers.service';
 import { CenterLinkRequest } from './center-link-request.entity';
 import { DiveInvite } from '../dives/dive-invite.entity';
+import { WarehouseMap } from './warehouse-map.entity';
+import { WarehouseObject } from './warehouse-object.entity';
 
 @Module({
-  imports: [AuthModule, TypeOrmModule.forFeature([DiveCenter, CenterInventoryItem, Dive, PlannedDive, DiveBuddy, DiveInvite, User, CenterLinkRequest])],
+  imports: [AuthModule, TypeOrmModule.forFeature([DiveCenter, CenterInventoryItem, WarehouseMap, WarehouseObject, Dive, PlannedDive, DiveBuddy, DiveInvite, User, CenterLinkRequest])],
   controllers: [CentersController, DiveCentersController],
   providers: [CentersService],
   exports: [CentersService],

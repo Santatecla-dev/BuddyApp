@@ -31,6 +31,9 @@ export class CenterInventoryItem {
   @Column({ type: 'timestamp', nullable: true })
   nextServiceDate: Date | null;
 
+  @Column({ type: 'int', nullable: true })
+  warehouseObjectId: number | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -131,6 +131,45 @@ export interface CenterInventoryItem {
   nextServiceDate?: string | null;
   createdAt: string;
   updatedAt: string;
+  warehouseObjectId?: number | null;
+}
+
+export type WarehouseObjectType = 'rack' | 'shelf' | 'workbench' | 'zone' | 'compressor';
+
+export interface WarehouseMap {
+  id: number;
+  centerId: number;
+  name: string;
+  width: number;
+  height: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateWarehouseMap {
+  name?: string;
+  width?: number;
+  height?: number;
+}
+
+export interface WarehouseObject {
+  id: number;
+  mapId: number;
+  type: WarehouseObjectType;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  color: string;
+  notes?: string | null;
+}
+
+export interface CenterWarehouse {
+  map: WarehouseMap;
+  objects: WarehouseObject[];
+  inventory: CenterInventoryItem[];
 }
 
 export interface CenterClient {

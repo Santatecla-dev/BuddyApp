@@ -8,4 +8,5 @@ export class UpdateInventoryItemDto {
   @IsOptional() @IsString() location?: string;
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsDateString() nextServiceDate?: string;
+  @IsOptional() @IsInt() @Min(0) warehouseObjectId?: number | null;
 }

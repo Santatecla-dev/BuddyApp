@@ -7,6 +7,9 @@ import { CreateCenterDiveDto } from './dto/create-center-dive.dto';
 import { RespondCenterLinkDto } from './dto/respond-center-link.dto';
 import { CreateInventoryBulkDto } from './dto/create-inventory-bulk.dto';
 import { UpdateCenterProfileDto } from './dto/update-center-profile.dto';
+import { CreateWarehouseObjectDto } from './dto/create-warehouse-object.dto';
+import { UpdateWarehouseObjectDto } from './dto/update-warehouse-object.dto';
+import { UpdateWarehouseMapDto } from './dto/update-warehouse-map.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('center')
@@ -21,6 +24,24 @@ export class CentersController {
 
   @Patch('profile')
   updateProfile(@Body() dto: UpdateCenterProfileDto, @Req() req) { return this.service.updateProfile(req.user.userId, dto); }
+
+  @Get('warehouse')
+  warehouse(@Req() req) { return this.service.getWarehouse(req.user.userId); }
+
+  @Patch('warehouse')
+  updateWarehouse(@Body() dto: UpdateWarehouseMapDto, @Req() req) { return this.service.updateWarehouse(req.user.userId, dto); }
+
+  @Post('warehouse/objects')
+  createWarehouseObject(@Body() dto: CreateWarehouseObjectDto, @Req() req) { return this.service.createWarehouseObject(req.user.userId, dto); }
+
+  @Delete('warehouse/objects')
+  clearWarehouse(@Req() req) { return this.service.clearWarehouse(req.user.userId); }
+
+  @Patch('warehouse/objects/:id')
+  updateWarehouseObject(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateWarehouseObjectDto, @Req() req) { return this.service.updateWarehouseObject(id, req.user.userId, dto); }
+
+  @Delete('warehouse/objects/:id')
+  removeWarehouseObject(@Param('id', ParseIntPipe) id: number, @Req() req) { return this.service.removeWarehouseObject(id, req.user.userId); }
 
   @Post('dives')
   createDive(@Body() dto: CreateCenterDiveDto, @Req() req) { return this.service.createDive(req.user.userId, dto); }
