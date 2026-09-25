@@ -18,6 +18,60 @@ import { DiveCenter } from '../centers/dive-center.entity';
 import { CenterLinkRequest, CenterLinkRequestStatus } from '../centers/center-link-request.entity';
 import { UpdateDiveDto } from './dto/update-dive.dto';
 
+type MarineMapCoordinate = { latitude: number; longitude: number; precision: 'location' | 'country' };
+
+// Dives currently store a country and a free-text site name rather than GPS
+// coordinates. These well-known sites give the community map useful anchors;
+// all other dives fall back to a country centroid and are labelled as such.
+const KNOWN_SITE_COORDINATES: Record<string, [number, number]> = {
+  fuvahmulah: [0.298, 73.424],
+  'tiger zoo': [0.3, 73.43],
+  panglao: [9.578, 123.747],
+  balicasag: [9.52, 123.69],
+  malapascua: [11.33, 124.12],
+  moalboal: [9.94, 123.40],
+  dauin: [9.19, 123.27],
+  'puerto galera': [13.51, 120.95],
+  cebu: [10.32, 123.90],
+  palawan: [9.83, 118.74],
+  'great barrier reef': [-18.29, 147.70],
+  'red sea': [27.25, 34.25],
+  'blue hole': [17.32, -87.53],
+};
+
+const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
+  australia: [-25.27, 133.78], austria: [47.52, 14.55], bahamas: [24.25, -76.00],
+  belize: [17.19, -88.50], brazil: [-10.81, -51.93], canada: [56.13, -106.35],
+  chile: [-35.68, -71.54], china: [35.86, 104.20], colombia: [4.57, -74.30],
+  costa_rica: [9.75, -83.75], croatia: [45.10, 15.20], cuba: [21.52, -77.78],
+  cyprus: [35.13, 33.43], denmark: [56.26, 9.50], dominican_republic: [18.74, -70.16],
+  ecuador: [-1.83, -78.18], egypt: [26.82, 30.80], fiji: [-17.71, 178.07],
+  france: [46.23, 2.21], germany: [51.17, 10.45], greece: [39.07, 21.82],
+  iceland: [64.96, -19.02], india: [20.59, 78.96], indonesia: [-0.79, 113.92],
+  italy: [41.87, 12.57], japan: [36.20, 138.25], kenya: [-0.02, 37.91],
+  malaysia: [4.21, 101.98], maldives: [3.20, 73.22], malta: [35.94, 14.38],
+  mauritius: [-20.35, 57.55], mexico: [23.63, -102.55], monaco: [43.74, 7.42],
+  mozambique: [-18.67, 35.53], new_zealand: [-40.90, 174.89], norway: [60.47, 8.47],
+  oman: [21.47, 55.98], palau: [7.51, 134.58], panama: [8.54, -80.78],
+  philippines: [12.88, 121.77], portugal: [39.40, -8.22], qatar: [25.35, 51.18],
+  russia: [61.52, 105.32], seychelles: [-4.68, 55.49], singapore: [1.35, 103.82],
+  south_africa: [-30.56, 22.94], spain: [40.46, -3.75], sri_lanka: [7.87, 80.77],
+  sweden: [60.13, 18.64], thailand: [15.87, 100.99], turkey: [38.96, 35.24],
+  united_arab_emirates: [23.42, 53.85], united_kingdom: [55.38, -3.44],
+  united_states: [37.09, -95.71], vanuatu: [-15.38, 166.96], vietnam: [14.06, 108.28],
+};
+
+const normalizeMapText = (value: string) => value.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const countryKey = (value: string) => normalizeMapText(value).replace(/ /g, '_');
+
+const locationCoordinate = (country: string, location: string): MarineMapCoordinate => {
+  const normalizedLocation = normalizeMapText(location);
+  const known = Object.entries(KNOWN_SITE_COORDINATES).find(([name]) => normalizedLocation.includes(name));
+  if (known) return { latitude: known[1][0], longitude: known[1][1], precision: 'location' };
+  const centroid = COUNTRY_CENTROIDS[countryKey(country)] || [0, 0];
+  return { latitude: centroid[0], longitude: centroid[1], precision: 'country' };
+};
+
 @Injectable()
 export class DivesService {
   diveRepository: any;
@@ -105,6 +159,87 @@ export class DivesService {
       ...species,
       sightingsCount: counts.get(species.key)?.size || 0,
     }));
+  }
+
+  async getMarineLifeMap(speciesKey?: string, period = 'all') {
+    const validPeriods = new Set(['week', 'month', 'sixMonths', 'year', 'all']);
+    const selectedPeriod = validPeriods.has(period) ? period : 'all';
+    const selectedSpecies = speciesKey ? getSpecies(speciesKey) : undefined;
+    if (speciesKey && !selectedSpecies) throw new BadRequestException('Especie no válida');
+
+    const daysByPeriod: Record<string, number> = { week: 7, month: 30, sixMonths: 182, year: 365 };
+    const since = daysByPeriod[selectedPeriod]
+      ? new Date(Date.now() - daysByPeriod[selectedPeriod] * 24 * 60 * 60 * 1000)
+      : null;
+    // Filter at the database boundary so a large community does not require
+    // every historical sighting to be loaded for each map interaction.
+    const sightingsQuery = this.diveSightingRepo
+      .createQueryBuilder('sighting')
+      .innerJoinAndSelect('sighting.dive', 'dive')
+      .orderBy('sighting.createdAt', 'DESC');
+    if (selectedSpecies) sightingsQuery.andWhere('sighting.speciesKey = :speciesKey', { speciesKey: selectedSpecies.key });
+    if (since) sightingsQuery.andWhere('dive.date >= :since', { since });
+    sightingsQuery.andWhere('dive.date <= :now', { now: new Date() });
+    const sightings = await sightingsQuery.getMany();
+    const points = new Map<string, {
+      latitude: number;
+      longitude: number;
+      precision: 'location' | 'country';
+      country: string;
+      location: string;
+      sightings: number;
+      dives: Set<number>;
+      species: Map<string, number>;
+      lastSeen: Date;
+    }>();
+
+    sightings.forEach((sighting) => {
+      const species = getSpecies(sighting.speciesKey);
+      const dive = sighting.dive;
+      if (!species || !dive) return;
+      const diveDate = new Date(dive.date);
+      const coordinate = locationCoordinate(dive.country, dive.location);
+      const key = `${coordinate.latitude.toFixed(3)}:${coordinate.longitude.toFixed(3)}:${normalizeMapText(dive.location)}`;
+      const current = points.get(key) || {
+        ...coordinate,
+        country: dive.country,
+        location: dive.location,
+        sightings: 0,
+        dives: new Set<number>(),
+        species: new Map<string, number>(),
+        lastSeen: diveDate,
+      };
+      current.sightings += 1;
+      current.dives.add(dive.id);
+      current.species.set(species.key, (current.species.get(species.key) || 0) + 1);
+      if (diveDate > current.lastSeen) current.lastSeen = diveDate;
+      points.set(key, current);
+    });
+
+    const serializedPoints = [...points.values()]
+      .sort((a, b) => b.sightings - a.sightings || b.lastSeen.getTime() - a.lastSeen.getTime())
+      .map((point) => ({
+        latitude: point.latitude,
+        longitude: point.longitude,
+        precision: point.precision,
+        country: point.country,
+        location: point.location,
+        sightings: point.sightings,
+        dives: point.dives.size,
+        lastSeen: point.lastSeen,
+        species: [...point.species.entries()].map(([key, count]) => {
+          const species = getSpecies(key);
+          return species ? { ...species, count } : { key, count };
+        }),
+      }));
+    return {
+      period: selectedPeriod,
+      speciesKey: selectedSpecies?.key || null,
+      points: serializedPoints,
+      totalSightings: serializedPoints.reduce((total, point) => total + point.sightings, 0),
+      totalLocations: serializedPoints.length,
+      generatedAt: new Date(),
+    };
   }
 
   private async ensureDiveMember(diveId: number, userId: number) {

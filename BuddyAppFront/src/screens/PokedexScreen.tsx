@@ -165,6 +165,11 @@ export default function PokedexScreen({ navigation }: any) {
           </View>
         </View>
 
+        <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('MarineLifeMap')} style={styles.communityMapButton}>
+          <Text style={styles.communityMapTitle}>Explore the community marine map</Text>
+          <Text style={styles.communityMapHint}>See sightings from buddies and dive centers by species and time range.</Text>
+        </TouchableOpacity>
+
         <TextInput
           accessibilityLabel="Search species"
           placeholder="Search creatures"
@@ -309,6 +314,9 @@ const styles = StyleSheet.create({
   headerStat: { width: 92, height: 92, borderRadius: 46, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 5, borderColor: '#00A8A8' },
   headerStatValue: { color: '#0077CC', fontSize: 25, fontWeight: 'bold' },
   headerStatLabel: { color: '#647c8b', fontSize: 11 },
+  communityMapButton: { backgroundColor: '#0c6672', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, marginBottom: 14 },
+  communityMapTitle: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  communityMapHint: { color: '#c9eff0', fontSize: 11, marginTop: 4 },
   searchInput: { minHeight: 48, backgroundColor: '#fff', borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 24, paddingHorizontal: 16, color: '#1e293b', fontSize: 15 },
   categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 16 },
   categoryButton: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: '#b8d8ee', borderRadius: 20, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 9 },

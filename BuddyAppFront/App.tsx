@@ -16,6 +16,7 @@ import PlannedDiveDetailScreen from './src/screens/PlannedDiveDetailScreen';
 import DiveTripsScreen from './src/screens/DiveTripsScreen';
 import DiveTripWorkspaceScreen from './src/screens/DiveTripWorkspaceScreen';
 import DiveMapScreen from './src/screens/DiveMapScreen';
+import MarineLifeMapScreen from './src/screens/MarineLifeMapScreen';
 import DiveActivityScreen from './src/screens/DiveActivityScreen';
 import EquipmentScreen from './src/screens/EquipmentScreen';
 import EquipmentDetailScreen from './src/screens/EquipmentDetailScreen';
@@ -71,6 +72,7 @@ export default function App() {
         <Stack.Screen name="DiveTrips" component={DiveTripsScreen} options={{ title: 'Dive trips' }} />
         <Stack.Screen name="DiveTripWorkspace" component={DiveTripWorkspaceScreen} options={{ title: 'Trip workspace' }} />
         <Stack.Screen name="DiveMap" component={DiveMapScreen} options={{ title: 'Dive map' }} />
+        <Stack.Screen name="MarineLifeMap" component={MarineLifeMapScreen} options={{ title: 'Marine life map' }} />
         <Stack.Screen name="DiveActivity" component={DiveActivityScreen} options={{ title: 'Dive activity' }} />
         <Stack.Screen name="Equipment" component={EquipmentScreen} options={{ title: 'My equipment' }} />
         <Stack.Screen name="EquipmentDetail" component={EquipmentDetailScreen} options={{ title: 'Equipment detail' }} />

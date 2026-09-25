@@ -382,6 +382,14 @@ export default function MyDivesScreen({ navigation, route }: any) {
 
       <TouchableOpacity
         accessibilityRole="button"
+        style={[styles.mapButton, styles.actionGridButton]}
+        onPress={() => navigation.navigate('MarineLifeMap')}
+      >
+        <Text style={styles.mapButtonText}>Explore community marine map</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        accessibilityRole="button"
         style={[styles.centerRosterButton, styles.actionGridButton]}
         onPress={() => navigation.navigate('CenterDiveRosters')}
       >
