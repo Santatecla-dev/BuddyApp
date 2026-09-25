@@ -46,7 +46,7 @@ const parsePoints = (value: string) => value.split(';').map((pair) => {
 }).filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
 
 export default function CenterDiveSitesScreen({ navigation }: any) {
-  const narrowLayout = useWindowDimensions().width < 620;
+  const narrowLayout = useWindowDimensions().width < 640;
   const [catalog, setCatalog] = useState<OperationMapTemplate[]>([]);
   const [speciesCatalog, setSpeciesCatalog] = useState<PokedexSpecies[]>([]);
   const [map, setMap] = useState<OperationMapTemplate | null>(null);

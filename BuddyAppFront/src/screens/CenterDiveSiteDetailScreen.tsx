@@ -6,7 +6,7 @@ import { DiveSite, PokedexSpecies } from '../types';
 
 export default function CenterDiveSiteDetailScreen({ navigation, route }: any) {
   const siteId = route?.params?.siteId;
-  const narrowLayout = useWindowDimensions().width < 620;
+  const narrowLayout = useWindowDimensions().width < 640;
   const [site, setSite] = useState<DiveSite | null>(null);
   const [speciesCatalog, setSpeciesCatalog] = useState<PokedexSpecies[]>([]);
   const [loading, setLoading] = useState(true);
