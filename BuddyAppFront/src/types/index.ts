@@ -13,6 +13,7 @@ export interface DiveCenter {
   description?: string | null;
   city?: string | null;
   country?: string | null;
+  operationMapKey?: string | null;
   email?: string | null;
   phone?: string | null;
   website?: string | null;
@@ -104,6 +105,9 @@ export interface PlannedDive {
   location: string;
   maxDepth: number;
   duration: number;
+  capacity: number;
+  isPublic: boolean;
+  inventoryAllocations?: Array<{ inventoryId: number; quantity: number; reserved: boolean }> | null;
   buddy: string;
   condition: string;
   gas: string;
@@ -115,6 +119,41 @@ export interface PlannedDive {
   updatedAt: string;
   centerId?: number | null;
   center?: DiveCenter | null;
+  diveSiteId?: number | null;
+  diveSite?: DiveSite | null;
+}
+
+export interface DiveSiteRoute {
+  name: string;
+  notes?: string;
+  points: Array<{ latitude: number; longitude: number; label?: string }>;
+}
+
+export interface DiveSite {
+  id: number;
+  centerId: number;
+  mapKey: string;
+  name: string;
+  description?: string | null;
+  latitude: number;
+  longitude: number;
+  minDepth?: number | null;
+  maxDepth?: number | null;
+  difficulty?: string | null;
+  currentInfo?: string | null;
+  highlights?: string[] | null;
+  typicalSightings?: string[] | null;
+  routes?: DiveSiteRoute[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OperationMapTemplate {
+  key: string;
+  name: string;
+  country: string;
+  bounds: { north: number; south: number; east: number; west: number };
+  attribution: string;
 }
 
 export type CenterInventoryStatus = 'available' | 'maintenance' | 'retired';
@@ -199,6 +238,24 @@ export interface PlannedDiveInvite {
   invitedByUser?: User;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
   createdAt: string;
+}
+
+export type RosterRequestStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED';
+
+export interface PlannedDiveRoster extends PlannedDive {
+  roster: { joined: number; capacity: number; requestStatus: RosterRequestStatus | null };
+}
+
+export interface PlannedDiveRosterRequest {
+  id: number;
+  plannedDiveId: number;
+  userId: number;
+  status: RosterRequestStatus;
+  message?: string | null;
+  createdAt: string;
+  respondedAt?: string | null;
+  user?: User;
+  plannedDive: PlannedDive;
 }
 
 export type DiveTripStatus = 'upcoming' | 'completed' | 'cancelled';

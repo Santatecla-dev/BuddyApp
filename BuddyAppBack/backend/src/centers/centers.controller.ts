@@ -10,6 +10,8 @@ import { UpdateCenterProfileDto } from './dto/update-center-profile.dto';
 import { CreateWarehouseObjectDto } from './dto/create-warehouse-object.dto';
 import { UpdateWarehouseObjectDto } from './dto/update-warehouse-object.dto';
 import { UpdateWarehouseMapDto } from './dto/update-warehouse-map.dto';
+import { CreateDiveSiteDto } from './dto/create-dive-site.dto';
+import { UpdateDiveSiteDto } from './dto/update-dive-site.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('center')
@@ -24,6 +26,27 @@ export class CentersController {
 
   @Patch('profile')
   updateProfile(@Body() dto: UpdateCenterProfileDto, @Req() req) { return this.service.updateProfile(req.user.userId, dto); }
+
+  @Get('operation-map')
+  operationMap(@Req() req) { return this.service.getOperationMap(req.user.userId); }
+
+  @Patch('operation-map')
+  selectOperationMap(@Body() body: { mapKey: string }, @Req() req) { return this.service.selectOperationMap(req.user.userId, body.mapKey); }
+
+  @Get('dive-sites')
+  diveSites(@Req() req) { return this.service.listDiveSites(req.user.userId); }
+
+  @Get('dive-sites/:id')
+  diveSite(@Param('id', ParseIntPipe) id: number, @Req() req) { return this.service.getDiveSite(req.user.userId, id); }
+
+  @Post('dive-sites')
+  createDiveSite(@Body() dto: CreateDiveSiteDto, @Req() req) { return this.service.createDiveSite(req.user.userId, dto); }
+
+  @Patch('dive-sites/:id')
+  updateDiveSite(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateDiveSiteDto, @Req() req) { return this.service.updateDiveSite(req.user.userId, id, dto); }
+
+  @Delete('dive-sites/:id')
+  removeDiveSite(@Param('id', ParseIntPipe) id: number, @Req() req) { return this.service.removeDiveSite(req.user.userId, id); }
 
   @Get('warehouse')
   warehouse(@Req() req) { return this.service.getWarehouse(req.user.userId); }
@@ -80,6 +103,9 @@ export class DiveCentersController {
 
   @Get()
   list(@Req() req) { return this.service.publicList(req.query?.search); }
+
+  @Get(':id/dive-sites')
+  publicDiveSites(@Param('id', ParseIntPipe) id: number) { return this.service.publicDiveSites(id); }
 
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number) { return this.service.publicGet(id); }

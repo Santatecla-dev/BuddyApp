@@ -1,4 +1,4 @@
-import { IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { DIVE_COUNTRY_VALUES } from '../country.values';
 
 export class CreatePlannedDiveDto {
@@ -22,6 +22,16 @@ export class CreatePlannedDiveDto {
   @Min(1)
   @Max(1440)
   duration: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  capacity?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean;
 
   @IsString()
   @IsNotEmpty()
@@ -47,6 +57,14 @@ export class CreatePlannedDiveDto {
   checklist?: Record<string, boolean>;
 
   @IsOptional()
+  @IsArray()
+  inventoryAllocations?: Array<{ inventoryId: number; quantity: number; reserved: boolean }>;
+
+  @IsOptional()
   @IsInt()
   centerId?: number;
+
+  @IsOptional()
+  @IsInt()
+  diveSiteId?: number;
 }

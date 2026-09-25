@@ -27,6 +27,9 @@ export class DiveCenter {
   country: string | null;
 
   @Column({ type: 'varchar', nullable: true })
+  operationMapKey: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
   email: string | null;
 
   @Column({ type: 'varchar', nullable: true })

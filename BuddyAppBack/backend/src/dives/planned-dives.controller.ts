@@ -13,6 +13,17 @@ export class PlannedDivesController {
   @Get()
   list(@Req() req) { return this.service.list(req.user.userId); }
 
+  @Get('rosters')
+  listCenterRosters(@Req() req) { return this.service.listCenterRosters(req.user.userId, req.query?.search); }
+
+  @Get('center/roster-requests')
+  centerRosterRequests(@Req() req) { return this.service.listCenterRosterRequests(req.user.userId); }
+
+  @Post('roster-requests/:id/respond')
+  respondToRosterRequest(@Param('id', ParseIntPipe) id: number, @Body() body: { accept: boolean }, @Req() req) {
+    return this.service.respondToRosterRequest(id, req.user.userId, body.accept);
+  }
+
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number, @Req() req) { return this.service.get(id, req.user.userId); }
 
@@ -27,6 +38,11 @@ export class PlannedDivesController {
 
   @Post(':id/log')
   log(@Param('id', ParseIntPipe) id: number, @Req() req) { return this.service.log(id, req.user.userId); }
+
+  @Post(':id/roster-request')
+  requestRosterJoin(@Param('id', ParseIntPipe) id: number, @Body() body: { message?: string }, @Req() req) {
+    return this.service.requestRosterJoin(id, req.user.userId, body.message);
+  }
   @Post('center')
   createForCenter(@Body() dto: CreateCenterPlannedDiveDto, @Req() req) { return this.service.createForCenter(dto, req.user.userId); }
 

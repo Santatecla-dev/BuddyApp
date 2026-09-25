@@ -18,10 +18,13 @@ import { DiveCenter } from '../centers/dive-center.entity';
 import { CenterLinkRequest } from '../centers/center-link-request.entity';
 import { PlannedDiveInvite } from './planned-dive-invite.entity';
 import { PlannedDiveBuddy } from './planned-dive-buddy.entity';
+import { PlannedDiveRosterRequest } from './planned-dive-roster-request.entity';
 import { User } from '../users/user.entity';
+import { CenterInventoryItem } from '../centers/center-inventory-item.entity';
+import { DiveSite } from '../centers/dive-site.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Dive, DiveBuddy, DiveInvite, DiveSighting, PlannedDive, PlannedDiveInvite, PlannedDiveBuddy, User, DiveTrip, TripPlannedDive, DiveCenter, CenterLinkRequest])],
+  imports: [TypeOrmModule.forFeature([Dive, DiveBuddy, DiveInvite, DiveSighting, PlannedDive, PlannedDiveInvite, PlannedDiveBuddy, PlannedDiveRosterRequest, User, DiveTrip, TripPlannedDive, DiveCenter, CenterLinkRequest, CenterInventoryItem, DiveSite])],
   providers: [DivesService, PlannedDivesService, DiveTripsService],
   controllers: [DivesController, PokedexController, PlannedDivesController, DiveTripsController],
 })

@@ -29,6 +29,9 @@ import CenterClientsScreen from './src/screens/CenterClientsScreen';
 import CenterLogDiveScreen from './src/screens/CenterLogDiveScreen';
 import CenterProfileScreen from './src/screens/CenterProfileScreen';
 import CenterWarehouseScreen from './src/screens/CenterWarehouseScreen';
+import CenterDiveRostersScreen from './src/screens/CenterDiveRostersScreen';
+import CenterDiveSitesScreen from './src/screens/CenterDiveSitesScreen';
+import CenterDiveSiteDetailScreen from './src/screens/CenterDiveSiteDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -48,6 +51,9 @@ export default function App() {
         <Stack.Screen name="CenterDashboard" component={CenterDashboardScreen} options={{ title: 'Center workspace', headerTintColor: '#123b52' }} />
         <Stack.Screen name="CenterProfile" component={CenterProfileScreen} options={{ title: 'Center profile', headerTintColor: '#123b52' }} />
         <Stack.Screen name="CenterWarehouse" component={CenterWarehouseScreen} options={{ title: 'Warehouse layout', headerTintColor: '#123b52' }} />
+        <Stack.Screen name="CenterDiveRosters" component={CenterDiveRostersScreen} options={{ title: 'Dive center rosters', headerTintColor: '#123b52' }} />
+        <Stack.Screen name="CenterDiveSites" component={CenterDiveSitesScreen} options={{ title: 'Dive sites map', headerTintColor: '#123b52' }} />
+        <Stack.Screen name="CenterDiveSiteDetail" component={CenterDiveSiteDetailScreen} options={{ title: 'Dive zone profile', headerTintColor: '#123b52' }} />
         <Stack.Screen name="CenterInventory" component={CenterInventoryScreen} options={{ title: 'Center inventory', headerTintColor: '#123b52' }} />
         <Stack.Screen name="CenterClients" component={CenterClientsScreen} options={{ title: 'Center clients', headerTintColor: '#123b52' }} />
         <Stack.Screen name="CenterLogDive" component={CenterLogDiveScreen} options={{ title: 'Log center dive', headerTintColor: '#123b52' }} />

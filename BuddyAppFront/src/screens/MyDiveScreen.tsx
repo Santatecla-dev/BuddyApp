@@ -380,6 +380,14 @@ export default function MyDivesScreen({ navigation, route }: any) {
         <Text style={styles.pokedexButtonText}>Open marine Pokedex</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        accessibilityRole="button"
+        style={[styles.centerRosterButton, styles.actionGridButton]}
+        onPress={() => navigation.navigate('CenterDiveRosters')}
+      >
+        <Text style={styles.centerRosterButtonText}>Find center dive rosters</Text>
+      </TouchableOpacity>
+
       </View>
 
 
@@ -654,6 +662,22 @@ const styles = StyleSheet.create({
 
   pokedexButtonText: {
     color: '#008d8d',
+    fontWeight: 'bold',
+  },
+
+  centerRosterButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#123b52',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    backgroundColor: '#edf4f5',
+  },
+
+  centerRosterButtonText: {
+    color: '#123b52',
     fontWeight: 'bold',
   },
 

@@ -19,6 +19,18 @@ import { WarehouseObject } from './warehouse-object.entity';
 import { CreateWarehouseObjectDto } from './dto/create-warehouse-object.dto';
 import { UpdateWarehouseObjectDto } from './dto/update-warehouse-object.dto';
 import { UpdateWarehouseMapDto } from './dto/update-warehouse-map.dto';
+import { DiveSite } from './dive-site.entity';
+import { CreateDiveSiteDto } from './dto/create-dive-site.dto';
+import { UpdateDiveSiteDto } from './dto/update-dive-site.dto';
+import { POKEDEX_SPECIES } from '../dives/pokedex.catalog';
+
+export const OPERATION_MAPS = [{
+  key: 'panglao-bohol',
+  name: 'Panglao & Bohol',
+  country: 'Philippines',
+  bounds: { north: 10.20, south: 9.45, east: 124.55, west: 123.55 },
+  attribution: 'GeoJSON boundaries · faeldon/philippines-json-maps (MIT)',
+}];
 
 @Injectable()
 export class CentersService {
@@ -33,7 +45,17 @@ export class CentersService {
     @InjectRepository(CenterLinkRequest) private readonly linkRequestsRepo: Repository<CenterLinkRequest>,
     @InjectRepository(WarehouseMap) private readonly warehouseMapsRepo: Repository<WarehouseMap>,
     @InjectRepository(WarehouseObject) private readonly warehouseObjectsRepo: Repository<WarehouseObject>,
+    @InjectRepository(DiveSite) private readonly diveSitesRepo: Repository<DiveSite>,
   ) {}
+
+  private normalizeTypicalSightings(values?: string[]) {
+    if (!values) return [];
+    const validKeys = new Set(POKEDEX_SPECIES.map((species) => species.key));
+    const unique = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+    const invalid = unique.filter((value) => !validKeys.has(value));
+    if (invalid.length) throw new BadRequestException(`Unknown Pokedex species: ${invalid.join(', ')}`);
+    return unique;
+  }
 
   async forOwner(userId: number) {
     const center = await this.centersRepo.findOne({ where: { ownerUserId: userId } });
@@ -98,6 +120,68 @@ export class CentersService {
     const values = Object.fromEntries(Object.entries(dto).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value]));
     Object.assign(center, values);
     return this.centersRepo.save(center);
+  }
+
+  async getOperationMap(userId: number) {
+    const center = await this.forOwner(userId);
+    const selectedMapKey = center.operationMapKey || null;
+    const map = OPERATION_MAPS.find((candidate) => candidate.key === selectedMapKey) || null;
+    const sites = selectedMapKey
+      ? await this.diveSitesRepo.find({ where: { centerId: center.id, mapKey: selectedMapKey }, order: { name: 'ASC' } })
+      : [];
+    return { catalog: OPERATION_MAPS, selectedMapKey, map, sites };
+  }
+
+  async selectOperationMap(userId: number, mapKey: string) {
+    const center = await this.forOwner(userId);
+    if (!OPERATION_MAPS.some((candidate) => candidate.key === mapKey)) throw new BadRequestException('This operation map is not available yet.');
+    center.operationMapKey = mapKey;
+    await this.centersRepo.save(center);
+    return this.getOperationMap(userId);
+  }
+
+  async listDiveSites(userId: number) {
+    const center = await this.forOwner(userId);
+    return this.diveSitesRepo.find({ where: { centerId: center.id }, order: { name: 'ASC' } });
+  }
+
+  async getDiveSite(userId: number, id: number) {
+    const center = await this.forOwner(userId);
+    const site = await this.diveSitesRepo.findOne({ where: { id, centerId: center.id } });
+    if (!site) throw new NotFoundException('Dive site not found');
+    return site;
+  }
+
+  async createDiveSite(userId: number, dto: CreateDiveSiteDto) {
+    const center = await this.forOwner(userId);
+    const mapKey = dto.mapKey || center.operationMapKey;
+    if (!mapKey || !OPERATION_MAPS.some((candidate) => candidate.key === mapKey)) throw new BadRequestException('Choose an operation map before adding a dive site.');
+    const map = OPERATION_MAPS.find((candidate) => candidate.key === mapKey)!;
+    if (dto.latitude < map.bounds.south || dto.latitude > map.bounds.north || dto.longitude < map.bounds.west || dto.longitude > map.bounds.east) throw new BadRequestException('The dive site pin must be inside the selected operation map.');
+    return this.diveSitesRepo.save(this.diveSitesRepo.create({ ...dto, centerId: center.id, mapKey, description: dto.description?.trim() || null, difficulty: dto.difficulty?.trim() || null, currentInfo: dto.currentInfo?.trim() || null, highlights: dto.highlights || [], typicalSightings: this.normalizeTypicalSightings(dto.typicalSightings), routes: dto.routes || [] }));
+  }
+
+  async updateDiveSite(userId: number, id: number, dto: UpdateDiveSiteDto) {
+    const site = await this.getDiveSite(userId, id);
+    const map = OPERATION_MAPS.find((candidate) => candidate.key === (dto.mapKey || site.mapKey));
+    if (!map) throw new BadRequestException('This operation map is not available yet.');
+    const latitude = dto.latitude ?? site.latitude;
+    const longitude = dto.longitude ?? site.longitude;
+    if (latitude < map.bounds.south || latitude > map.bounds.north || longitude < map.bounds.west || longitude > map.bounds.east) throw new BadRequestException('The dive site pin must stay inside the selected operation map.');
+    Object.assign(site, dto, { mapKey: map.key, latitude, longitude, ...(dto.typicalSightings ? { typicalSightings: this.normalizeTypicalSightings(dto.typicalSightings) } : {}) });
+    return this.diveSitesRepo.save(site);
+  }
+
+  async removeDiveSite(userId: number, id: number) {
+    const site = await this.getDiveSite(userId, id);
+    await this.diveSitesRepo.remove(site);
+    return { deleted: true };
+  }
+
+  async publicDiveSites(centerId: number) {
+    const center = await this.centersRepo.findOne({ where: { id: centerId } });
+    if (!center) throw new NotFoundException('Dive center not found');
+    return this.diveSitesRepo.find({ where: { centerId: center.id }, order: { name: 'ASC' } });
   }
 
   async getWarehouse(userId: number) {
